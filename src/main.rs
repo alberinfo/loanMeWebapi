@@ -10,14 +10,14 @@ async fn main() {
 
     dotenvy::dotenv(); //load environment vars
 
-    let dbPool = db::getDbConnection().await;
+    //let dbPool = db::getDbConnection().await;
 
     //All routes nested under /v0
     let v0: Router = axum::Router::new()
-        .route("/Users", get(getAllUsuarios))
+        .route("/Users", get(getAllUsuarios));
         //.route("/Alumnos/:id", get(getAlumnoById))
         //.route("/Alumnos", post(insertAlumno))
-        .with_state(dbPool);
+        //.with_state(dbPool);
 
     //Al routes nested under /api (i.e, /v0/*)
     let api: Router = axum::Router::new()
@@ -46,6 +46,6 @@ async fn pageNotFound() -> impl IntoResponse {
     return (StatusCode::NOT_FOUND, "Page not found!");
 }
 
-async fn getAllUsuarios(State(dbPool): State<sqlx::PgPool>) -> Result<String, (StatusCode, String)> {
+async fn getAllUsuarios(/*State(dbPool): State<sqlx::PgPool>*/) -> Result<String, (StatusCode, String)> {
     return Ok("LMAO".to_string());
 }
