@@ -1,23 +1,32 @@
-use axum::{routing::*, extract::Path, http::StatusCode, response::IntoResponse, Json, extract::State};
-use axum_server::tls_rustls::RustlsConfig;
-use std::{net::SocketAddr};
+#![allow(non_snake_case)]
 
+use axum::{routing::*, middleware};
+use axum_server::tls_rustls::RustlsConfig;
+use std::{error::Error, net::SocketAddr};
+
+mod endpoints;
 mod db;
+mod logic;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init(); //Initialize logging
 
-    dotenvy::dotenv(); //load environment vars
+    let _ = dotenvy::dotenv(); //load environment vars
 
-    //let dbPool = db::getDbConnection().await;
+    let dbPool = db::getDbConnection().await;
 
+    if db::getTableCount(&dbPool).await == 0 {
+        sqlx::migrate!("./migrations").run(&dbPool).await?;
+    }
+    
     //All routes nested under /v0
     let v0: Router = axum::Router::new()
-        .route("/Users", get(getAllUsuarios));
+        .route("/registrarUsuario", get(endpoints::registrarUsuario))
         //.route("/Alumnos/:id", get(getAlumnoById))
         //.route("/Alumnos", post(insertAlumno))
-        //.with_state(dbPool);
+        .layer(middleware::from_fn_with_state(dbPool.clone(), endpoints::validateCredentialsLayer))
+        .with_state(dbPool);
 
     //Al routes nested under /api (i.e, /v0/*)
     let api: Router = axum::Router::new()
@@ -26,7 +35,7 @@ async fn main() {
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
         .nest("/api", api)
-        .fallback(pageNotFound);
+        .fallback(endpoints::pageNotFound);
 
     let addr: SocketAddr = SocketAddr::from(([127,0,0,1], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(
@@ -40,12 +49,6 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
 
-async fn pageNotFound() -> impl IntoResponse {
-    return (StatusCode::NOT_FOUND, "Page not found!");
-}
-
-async fn getAllUsuarios(/*State(dbPool): State<sqlx::PgPool>*/) -> Result<String, (StatusCode, String)> {
-    return Ok("LMAO".to_string());
+    Ok(())
 }
