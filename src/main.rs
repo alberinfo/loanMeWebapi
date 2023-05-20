@@ -23,6 +23,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //All routes nested under /v0
     let v0: Router = axum::Router::new()
         .route("/registrarUsuario", get(endpoints::registrarUsuario))
+        .route("/loginUsuario", get(endpoints::loginUsuario))
         //.route("/Alumnos/:id", get(getAlumnoById))
         //.route("/Alumnos", post(insertAlumno))
         .layer(middleware::from_fn_with_state(dbPool.clone(), endpoints::validateCredentialsLayer))

@@ -1,4 +1,4 @@
-use axum::{http::{StatusCode, Request}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
+use axum::{http::{StatusCode, Request}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next, Error};
 use crate::{db, logic::{self, generatePwdPHC}};
 
 pub async fn pageNotFound() -> impl IntoResponse {
@@ -30,6 +30,7 @@ pub async fn validateCredentialsLayer(State(dbPool): State<sqlx::PgPool>, req: R
     };
 }*/
 
+//TODO: Should return session id
 pub async fn registrarUsuario(State(dbPool): State<sqlx::PgPool>, Json(mut payload): Json<db::Usuario>) -> String {
     payload.hashcontrasenna = logic::generatePwdPHC(payload.hashcontrasenna.clone()).await;
     let res = db::insertarUsuario(payload, &dbPool).await;
@@ -37,8 +38,27 @@ pub async fn registrarUsuario(State(dbPool): State<sqlx::PgPool>, Json(mut paylo
         Ok(r) => match r.rows_affected() {
             0 => "There was an error while creating the user".to_string(),
             1 => "Done".to_string(),
-            _ => "WTF".to_string()
+            _ => "This should not have happened.".to_string()
         },
         Err(r) => r.to_string()
+    };
+}
+
+//TODO: Return session id
+pub async fn loginUsuario(State(dbPool): State<sqlx::PgPool>, Json(mut payload): Json<db::Usuario>) -> Result<String, String> {
+    let usuario = db::buscarUsuario(payload.nombreusuario, &dbPool).await;
+
+    if usuario.is_err() == true {
+        match usuario.unwrap_err() {
+            //no se encontro el usuario
+            sqlx::Error::RowNotFound => return Err("User does not exist".to_string()),
+            x => return Err(x.to_string())
+        }
+    }
+
+    let valid = logic::validatePwdPHC(payload.hashcontrasenna, usuario.unwrap().hashcontrasenna).await;
+    return match valid {
+        false => Err("Wrong password".to_string()),
+        true => Ok("Ok".to_string())
     };
 }

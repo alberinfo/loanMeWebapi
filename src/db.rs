@@ -19,6 +19,7 @@ pub struct Usuario {
     #[serde(skip_serializing)]
     pub idwallet: Option<String>,
 
+    #[serde(default)]
     pub tipousuario: String
 }
 
