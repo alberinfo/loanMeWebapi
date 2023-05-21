@@ -1,3 +1,5 @@
+CREATE TYPE tiposUsuario AS ENUM('prestatario', 'prestamista', 'administrador');
+
 CREATE TABLE Usuario(
     ID SERIAL PRIMARY KEY NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -5,5 +7,5 @@ CREATE TABLE Usuario(
     nombreUsuario TEXT UNIQUE NOT NULL,
     hashContrasenna TEXT NOT NULL,
     idWallet TEXT,
-    tipoUsuario TEXT NOT NULL
+    tipoUsuario tiposusuario NOT NULL
 );

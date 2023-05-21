@@ -3,10 +3,10 @@
 use axum::{routing::*, middleware};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
+use loanMeWebapi::endpoints::*;
+use loanMeWebapi::db::*;
 
-mod endpoints;
-mod db;
-mod logic;
+//mod lib;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -16,7 +16,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let dbPool = db::getDbConnection().await;
 
-    if db::getTableCount(&dbPool).await == 0 {
+    let tableCount = db::getTableCount(&dbPool).await;
+    if tableCount == 0 || tableCount == 1 { //assuming tablecount = 0 means db was just created, and = 1 means just _sqlx_migrations exists
         sqlx::migrate!("./migrations").run(&dbPool).await?;
     }
     
