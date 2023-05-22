@@ -1,8 +1,9 @@
+#![allow(non_snake_case)]
+
 use argon2::{
     password_hash::{ rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString },
     Argon2
 };
-use tokio::task::JoinError;
 
 #[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug)]
 #[sqlx(type_name = "tiposusuario", rename_all = "lowercase")]

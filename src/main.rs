@@ -3,8 +3,9 @@
 use axum::{routing::*, middleware};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
-use loanMeWebapi::endpoints::*;
+use loanMeWebapi::routes::*;
 use loanMeWebapi::db::*;
+use redis::RedisError;
 
 //mod lib;
 
@@ -14,21 +15,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let _ = dotenvy::dotenv(); //load environment vars
 
-    let dbPool = db::getDbConnection().await;
+    let dbPoolResult = db::getDbConnection().await;
 
+    if dbPoolResult.is_err() == true {
+        eprintln!("Error while connecting to postgres");
+        return Err(dbPoolResult.unwrap_err().to_string().into());
+    }
+
+    let dbPool: sqlx::Pool<sqlx::Postgres> = dbPoolResult.unwrap();
     let tableCount = db::getTableCount(&dbPool).await;
     if tableCount == 0 || tableCount == 1 { //assuming tablecount = 0 means db was just created, and = 1 means just _sqlx_migrations exists
-        sqlx::migrate!("./migrations").run(&dbPool).await?;
+        sqlx::migrate!("./migrations").run(&dbPool).await;
     }
-    
+
+    let redisPoolResult: Result<redis::aio::ConnectionManager, RedisError> = redisServer::getRedisConnection().await;
+
+    if redisPoolResult.is_err() == true {
+        let redisError = redisPoolResult.err().unwrap();
+        eprintln!("Error while connecting to redis ({:?})", redisError.kind());
+        return Err(redisError.detail().unwrap().into());
+    }
+
+    let redisPool = redisPoolResult.unwrap();
+
     //All routes nested under /v0
     let v0: Router = axum::Router::new()
         .route("/registrarUsuario", get(endpoints::registrarUsuario))
         .route("/loginUsuario", get(endpoints::loginUsuario))
-        //.route("/Alumnos/:id", get(getAlumnoById))
-        //.route("/Alumnos", post(insertAlumno))
-        .layer(middleware::from_fn_with_state(dbPool.clone(), endpoints::validateCredentialsLayer))
-        .with_state(dbPool);
+        .layer(middleware::from_fn_with_state((dbPool.clone(), redisPool.clone()), auth::validateCredentialsLayer))
+        .with_state((dbPool, redisPool));
 
     //Al routes nested under /api (i.e, /v0/*)
     let api: Router = axum::Router::new()

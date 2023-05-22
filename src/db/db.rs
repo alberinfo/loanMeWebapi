@@ -1,8 +1,10 @@
+#![allow(non_snake_case)]
+
 use sqlx::{postgres::{PgRow, PgQueryResult}, Row, Column};
 use crate::models::usuario::{Usuario, TipoUsuario};
 
-pub async fn getDbConnection() -> sqlx::PgPool {
-    return sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap()).await.unwrap();
+pub async fn getDbConnection() -> sqlx::Result<sqlx::PgPool> {
+    return sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap()).await;
 }
 
 pub async fn getTableCount(dbPool: &sqlx::PgPool) -> i64 {
