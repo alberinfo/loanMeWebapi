@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(clippy::needless_return)]
 
 use sqlx::{postgres::{PgRow, PgQueryResult}, Row, Column};
 use crate::models::usuario::{Usuario, TipoUsuario};
@@ -23,7 +24,6 @@ pub async fn buscarUsuario(nomUsuario: &String, dbPool: &sqlx::PgPool) -> sqlx::
 }
 
 pub async fn insertarUsuario(usuario: Usuario, dbPool: &sqlx::PgPool) -> sqlx::Result<PgQueryResult> {
-    println!("{:?}", usuario.tipousuario);
     let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, hashcontrasenna, idwallet, tipousuario) VALUES($1, $2, $3, $4, $5, $6)")
         .bind(usuario.email)
         .bind(usuario.nombrecompleto)

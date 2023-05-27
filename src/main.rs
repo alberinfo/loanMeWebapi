@@ -4,7 +4,7 @@ use axum::{routing::*, middleware};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
-use loanMeWebapi::db::*;
+use loanMeWebapi::services::*;
 use redis::RedisError;
 
 //mod lib;
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let dbPoolResult = db::getDbConnection().await;
 
-    if dbPoolResult.is_err() == true {
+    if dbPoolResult.is_err() {
         eprintln!("Error while connecting to postgres");
         return Err(dbPoolResult.unwrap_err().to_string().into());
     }
@@ -25,15 +25,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let dbPool: sqlx::Pool<sqlx::Postgres> = dbPoolResult.unwrap();
     let tableCount = db::getTableCount(&dbPool).await;
     if tableCount == 0 || tableCount == 1 { //assuming tablecount = 0 means db was just created, and = 1 means just _sqlx_migrations exists
-        sqlx::migrate!("./migrations").run(&dbPool).await;
+        let res = sqlx::migrate!("./migrations").run(&dbPool).await;
+        if res.is_err() {
+            let err = res.unwrap_err();
+            eprintln!("There was an error while migrating the database", );
+            return Err(err.source().unwrap().to_string().into());
+        }
     }
 
     let redisPoolResult: Result<redis::aio::ConnectionManager, RedisError> = redisServer::getRedisConnection().await;
 
-    if redisPoolResult.is_err() == true {
-        let redisError = redisPoolResult.err().unwrap();
-        eprintln!("Error while connecting to redis ({:?})", redisError.kind());
-        return Err(redisError.detail().unwrap().into());
+    if redisPoolResult.is_err() {
+        let err = redisPoolResult.err().unwrap();
+        eprintln!("Error while connecting to redis ({:?})", err.kind());
+        return Err(err.detail().unwrap().into());
     }
 
     let redisPool = redisPoolResult.unwrap();
@@ -42,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let v0: Router = axum::Router::new()
         .route("/registrarUsuario", get(endpoints::registrarUsuario))
         .route("/loginUsuario", get(endpoints::loginUsuario))
-        .layer(middleware::from_fn_with_state((dbPool.clone(), redisPool.clone()), auth::validateCredentialsLayer))
+        .layer(middleware::from_fn_with_state((dbPool.clone(), redisPool.clone()), auth::validationLayer))
         .with_state((dbPool, redisPool));
 
     //Al routes nested under /api (i.e, /v0/*)

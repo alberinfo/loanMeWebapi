@@ -9,7 +9,8 @@ edition = "2021"
 axum = "0.6.18"
 axum-server = { version = "0.5.0", features = ["tls-rustls"] }
 tokio = { version = "1.28.0", features = ["full"] }
-serde = { version = "1.0.160", features = ["derive"] }
+serde = { version = "1.0.163", features = ["derive"] }
+serde_json = { version = "1.0.96", default_features = false, features = ["alloc"] }
 dotenvy = "0.15.7"
 sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres"] }
 argon2 = "0.5.0"
