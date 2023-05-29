@@ -6,6 +6,6 @@ CREATE TABLE Prestamo(
     plazoPago DATE NOT NULL, 
     intervaloPago TEXT NOT NULL,
     riesgo int NOT NULL,
-    fkPrestatario INT NOT NULL REFERENCES Usuario(ID)
-    fkPrestamistma INT NOT NULL REFERENCES Usuario(ID)
+    fkPrestatario INT NOT NULL REFERENCES Usuario(ID),
+    fkPrestamista INT NOT NULL REFERENCES Usuario(ID)
 )

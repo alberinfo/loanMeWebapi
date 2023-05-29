@@ -1,4 +1,4 @@
-CREATE TABLE Usuario(
+CREATE TABLE Seguro(
 	ID SERIAL PRIMARY KEY NOT NULL,
 	prima float NOT NULL,
 	plazoPago DATE NOT NULL,
