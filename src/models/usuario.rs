@@ -32,7 +32,7 @@ pub struct Usuario {
 
     pub nombreusuario: String,
 
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, alias="contrasenna")]
     pub hashcontrasenna: String,
 
     #[serde(skip_serializing)]

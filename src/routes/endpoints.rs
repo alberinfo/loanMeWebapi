@@ -34,18 +34,20 @@ pub async fn loginUsuario(State((dbPool, mut redisPool)): State<(sqlx::PgPool, r
         }
     }
 
+    let usuario: Usuario = usuario.unwrap();
+
     //usuario.hashContrasenna currently contains the PHC
-    let validPwd = payload.validatePwd(usuario.unwrap().hashcontrasenna).await;
+    let validPwd = payload.validatePwd(usuario.hashcontrasenna).await;
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, "Wrong password".to_string()));
     }
 
 
-    let nuevaSession = session::Session::new().await;
+    let nuevaSession = session::Session::new(usuario.nombreusuario).await;
     let res = insertUserSession(&nuevaSession, &mut redisPool).await;
     return match res {
-        Ok(_) => Ok(nuevaSession.id),
+        Ok(_) => Ok(Json(nuevaSession)),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap())))
     };
 }
