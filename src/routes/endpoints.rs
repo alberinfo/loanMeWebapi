@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use axum::{http::{StatusCode, Request}, response::{IntoResponse, Response}, Json, extract::State};
-use crate::{services::{db, redisServer::insertUserSession}, models::{usuario::Usuario, session}};
+use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State};
+use crate::{services::{db, redisServer::{insertUserSession, deleteUserSession,self}}, models::{usuario::Usuario, session}};
 
 pub async fn pageNotFound() -> impl IntoResponse {
     return (StatusCode::NOT_FOUND, "Page not found!");
@@ -43,11 +43,21 @@ pub async fn loginUsuario(State((dbPool, mut redisPool)): State<(sqlx::PgPool, r
         return Err((StatusCode::UNAUTHORIZED, "Wrong password".to_string()));
     }
 
-
     let nuevaSession = session::Session::new(usuario.nombreusuario).await;
     let res = insertUserSession(&nuevaSession, &mut redisPool).await;
     return match res {
         Ok(_) => Ok(Json(nuevaSession)),
-        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap())))
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    };
+}
+
+pub async fn logoutUsuario(State((_dbPool, mut redisPool)): State<(sqlx::PgPool, redis::aio::ConnectionManager)>, headers: header::HeaderMap) -> impl IntoResponse {
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+
+    //We dont need to check if the header exists, we already did that in auth.rs
+    let res = redisServer::deleteUserSession(&sessionId, &mut redisPool).await;
+    return match res {
+        Ok(_) => Ok(String::from("Done")),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     };
 }

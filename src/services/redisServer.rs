@@ -5,13 +5,18 @@
 use redis::AsyncCommands;
 use crate::models::session;
 
-static DEFAULT_SESSION_EXPIRATION: usize = 600; //600 secs --> 10 minutes
+pub static DEFAULT_SESSION_EXPIRATION: usize = 600; //600 secs --> 10 minutes
 
 pub async fn getRedisConnection() -> redis::RedisResult<redis::aio::ConnectionManager> {
     let client: redis::Client = redis::Client::open(std::env::var("REDIS_URL").unwrap()).unwrap();
     let connManager: redis::RedisResult<redis::aio::ConnectionManager> = client.get_tokio_connection_manager().await;
 
     return connManager;
+}
+
+//TTL = Time to live
+pub async fn getUserSessionTTL(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<i64> {
+    return redisConn.ttl(format!("{}{}", "sessionId", sessionId)).await;
 }
 
 pub async fn insertUserSession(sess: &session::Session, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
@@ -24,7 +29,7 @@ pub async fn verifyUserSession(sessionId: &String, redisConn: &mut redis::aio::C
     return redisConn.exists(format!("{}{}", "sessionId", sessionId)).await.unwrap();
 }
 
-pub async fn updateSessionTimeout(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
+pub async fn refreshUserSession(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
     return redisConn.expire(format!("{}{}", "sessionId", sessionId), DEFAULT_SESSION_EXPIRATION).await;
 }
 

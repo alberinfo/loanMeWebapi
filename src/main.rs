@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if redisPoolResult.is_err() {
         let err = redisPoolResult.err().unwrap();
         eprintln!("Error while connecting to redis ({:?})", err.kind());
-        return Err(err.detail().unwrap().into());
+        return Err(err.detail().unwrap_or("no further detail was provided").into());
     }
 
     let redisPool = redisPoolResult.unwrap();
@@ -46,7 +46,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //All routes nested under /v0
     let v0: Router = axum::Router::new()
         .route("/registrarUsuario", post(endpoints::registrarUsuario))
-        .route("/loginUsuario", get(endpoints::loginUsuario))
+        .route("/loginUsuario", post(endpoints::loginUsuario))
+        .route("/logoutUsuario", post(endpoints::logoutUsuario))
         .layer(middleware::from_fn_with_state((dbPool.clone(), redisPool.clone()), auth::validationLayer))
         .with_state((dbPool, redisPool));
 
