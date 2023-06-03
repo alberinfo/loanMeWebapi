@@ -3,6 +3,8 @@
 
 use argon2::password_hash::rand_core::{RngCore, OsRng};
 use sha2::{Sha512, Digest};
+use redis::AsyncCommands;
+use crate::services::redisServer::DEFAULT_SESSION_EXPIRATION;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Session {
@@ -10,7 +12,7 @@ pub struct Session {
     pub username: String, //which user does this session belong to?
     #[serde(rename="sessionId")]
     pub id: String,
-    pub creationDate: chrono::DateTime<chrono::Utc>
+    pub creationDate: Option<chrono::DateTime<chrono::Utc>>
 }
 
 impl Session {
@@ -25,9 +27,33 @@ impl Session {
         let newSession = Session {
             username: user,
             id: sessionIdHash,
-            creationDate: chrono::Utc::now()
+            creationDate: Some(chrono::Utc::now())
         };
 
         return newSession;
+    }
+
+    //TTL = Time to live
+    pub async fn getTTL(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<i64> {
+        return redisConn.ttl(format!("{}{}", "sessionId", self.id)).await;
+    }
+
+    pub async fn createSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
+        //Generic params are: param1, param2, return type.
+        return redisConn.set_ex::<String, String, String>(format!("{}{}", "sessionId", self.id), serde_json::to_string(self).unwrap(), DEFAULT_SESSION_EXPIRATION).await;
+    }
+
+    //Check if user session exists
+    pub async fn verifySession(&self, redisConn: &mut redis::aio::ConnectionManager) -> bool {
+        return redisConn.exists(format!("{}{}", "sessionId", self.id)).await.unwrap();
+    }
+
+    pub async fn refreshSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
+        return redisConn.expire(format!("{}{}", "sessionId", self.id), DEFAULT_SESSION_EXPIRATION).await;
+    }
+
+    //When user logs out, probably.
+    pub async fn deleteSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
+        return redisConn.del(format!("{}{}", "sessionId", self.id)).await;
     }
 }

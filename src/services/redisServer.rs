@@ -2,38 +2,33 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use redis::AsyncCommands;
-use crate::models::session;
-
 pub static DEFAULT_SESSION_EXPIRATION: usize = 600; //600 secs --> 10 minutes
 
-pub async fn getRedisConnection() -> redis::RedisResult<redis::aio::ConnectionManager> {
-    let client: redis::Client = redis::Client::open(std::env::var("REDIS_URL").unwrap()).unwrap();
-    let connManager: redis::RedisResult<redis::aio::ConnectionManager> = client.get_tokio_connection_manager().await;
-
-    return connManager;
+#[derive(Clone)]
+pub struct redisState {
+    pub redisConn: Option<redis::aio::ConnectionManager>
 }
 
-//TTL = Time to live
-pub async fn getUserSessionTTL(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<i64> {
-    return redisConn.ttl(format!("{}{}", "sessionId", sessionId)).await;
-}
+impl redisState {    
+    pub fn new() -> redisState {
+        let newState = redisState {
+            redisConn: None
+        };
+        return newState;
+    }
 
-pub async fn insertUserSession(sess: &session::Session, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
-    //Generic params are: param1, param2, return type.
-    return redisConn.set_ex::<String, String, String>(format!("{}{}", "sessionId", sess.id), serde_json::to_string(sess).unwrap(), DEFAULT_SESSION_EXPIRATION).await;
-}
+    pub async fn connect(&mut self) -> redis::RedisResult<()> {
+        let client: redis::Client = redis::Client::open(std::env::var("REDIS_URL").unwrap()).unwrap();
+        self.redisConn = Some(client.get_tokio_connection_manager().await?);
+    
+        return Ok(());
+    }
+    
+    pub fn getConnection(&mut self) -> Option<&mut redis::aio::ConnectionManager> {
+        if self.redisConn.is_none() {
+            return None;
+        }
 
-//Check if user session exists
-pub async fn verifyUserSession(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> bool {
-    return redisConn.exists(format!("{}{}", "sessionId", sessionId)).await.unwrap();
-}
-
-pub async fn refreshUserSession(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
-    return redisConn.expire(format!("{}{}", "sessionId", sessionId), DEFAULT_SESSION_EXPIRATION).await;
-}
-
-//When user logs out, probably.
-pub async fn deleteUserSession(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
-    return redisConn.del(format!("{}{}", "sessionId", sessionId)).await;
+        return Some(self.redisConn.as_mut().unwrap());
+    }
 }
