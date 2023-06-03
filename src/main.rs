@@ -10,7 +10,7 @@ use loanMeWebapi::services::*;
 async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init(); //Initialize logging
 
-    let _ = dotenvy::dotenv(); //load environment vars
+    dotenvy::dotenv()?; //load environment vars
 
     let mut pgState = db::dbState::default();
     pgState.connect().await?;
