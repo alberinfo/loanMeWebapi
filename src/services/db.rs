@@ -8,24 +8,20 @@ pub struct dbState {
     pub dbPool: Option<sqlx::PgPool>
 }
 
-impl dbState {
-    pub fn new() -> dbState {
-        let newState = dbState {
-            dbPool: None
-        };
-        return newState;
+impl Default for dbState {
+    fn default() -> Self {
+        return dbState { dbPool: None };
     }
+}
 
+impl dbState {
     pub async fn connect(&mut self) -> sqlx::Result<()> {
         self.dbPool = Some(sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap()).await?);
         return Ok(());
     }
 
     pub fn getConnection(&self) -> Option<&sqlx::PgPool> {
-        if self.dbPool.is_none() {
-            return None;
-        }
-        return Some(self.dbPool.as_ref().unwrap());
+        return self.dbPool.as_ref();
     }
 
     pub async fn getTableCount(&self) -> i64 {
@@ -37,7 +33,7 @@ impl dbState {
     pub async fn migrateDb(&self) -> sqlx::Result<()> {
         let tableCount = self.getTableCount().await;
         if tableCount == 0 || tableCount == 1 { //assuming tablecount = 0 means db was just created, and = 1 means just _sqlx_migrations exists
-            let res = sqlx::migrate!("./migrations").run(self.dbPool.as_ref().unwrap()).await?;
+            sqlx::migrate!("./migrations").run(self.dbPool.as_ref().unwrap()).await?;
         }
         return Ok(());
     }

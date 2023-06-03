@@ -5,9 +5,6 @@ use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
 use loanMeWebapi::services::*;
-use redis::RedisError;
-
-//mod lib;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -15,12 +12,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let _ = dotenvy::dotenv(); //load environment vars
 
-    let mut pgState = db::dbState::new();
+    let mut pgState = db::dbState::default();
     pgState.connect().await?;
     pgState.migrateDb().await?; //migrates the database if its empty
     
 
-    let mut rdState = redisServer::redisState::new();
+    let mut rdState = redisServer::redisState::default();
     rdState.connect().await?;
 
     let appState = appState::AppState {

@@ -4,5 +4,5 @@
 use axum::{http::StatusCode, response::IntoResponse};
 
 pub async fn pageNotFound() -> impl IntoResponse {
-    return (StatusCode::NOT_FOUND, "Page not found!");
+    return (StatusCode::NOT_FOUND, String::from("Page not found!"));
 }

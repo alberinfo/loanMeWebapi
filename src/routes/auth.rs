@@ -54,9 +54,9 @@ pub async fn registro(State(appState): State<appState::AppState>, Json(mut paylo
 
     return match res {
         Ok(r) => match r.rows_affected() {
-            0 => Err((StatusCode::BAD_REQUEST, "There was an error while creating the user".to_string())),
-            1 => Ok("Done".to_string()),
-            _ => Err((StatusCode::INTERNAL_SERVER_ERROR, "This should not have happened.".to_string()))
+            0 => Err((StatusCode::BAD_REQUEST, String::from("There was an error while creating the user"))),
+            1 => Ok(String::from("Done")),
+            _ => Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("This should not have happened.")))
         },
 
         Err(r) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
@@ -72,7 +72,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     if usuario.is_err() {
         match usuario.unwrap_err() {
             //no se encontro el usuario
-            sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, "User does not exist".to_string())),
+            sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
             x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
         }
     }
@@ -83,7 +83,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let validPwd = payload.validatePwd(usuario.hashcontrasenna).await;
 
     if !validPwd {
-        return Err((StatusCode::UNAUTHORIZED, "Wrong password".to_string()));
+        return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
     }
 
     let nuevaSession = Session::new(usuario.nombreusuario).await;
