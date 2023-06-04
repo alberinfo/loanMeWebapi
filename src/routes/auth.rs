@@ -28,7 +28,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
         id: auth_header.unwrap().to_string(),
         creationDate: None
     };
-    if !(session.verifySession(redisConnection).await) {
+    if !(session.verifySessionById(redisConnection).await) {
         return (StatusCode::UNAUTHORIZED, String::from("AUTHORIZATION Header is invalid")).into_response();
     }
 
@@ -84,6 +84,24 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
+    }
+
+    let mut oldSession = Session {
+        username: usuario.nombreusuario.clone(),
+        id: String::from(""),
+        creationDate: None
+    };
+
+    let userHasActiveSession = oldSession.verifySessionByUsername(redisConnection).await;
+
+    //If the user already has an active session, close it.
+    if userHasActiveSession {
+        oldSession.id = oldSession.getSessionIdByUsername(redisConnection).await.unwrap();
+        let res = oldSession.deleteSession(redisConnection).await;
+        if res.is_err() {
+            let err = res.err().unwrap();
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
+        }
     }
 
     let nuevaSession = Session::new(usuario.nombreusuario).await;
