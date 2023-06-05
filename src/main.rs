@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 
-    //Al routes nested under /api (i.e, /v0/*)
+    //Al routes nested under /api (i.e, /auth/*)
     let api: Router = axum::Router::new()
         .nest("/auth", auth);
 

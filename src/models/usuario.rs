@@ -14,10 +14,11 @@ pub enum TipoUsuario {
     Administrador
 }
 
-fn defaultTipoUsuario() -> TipoUsuario {
-    return TipoUsuario::Prestatario; //No se si es lo correcto, pero por ahora funciona.
+impl Default for TipoUsuario {
+    fn default() -> Self {
+        TipoUsuario::Prestatario
+    }
 }
-
 
 #[derive(sqlx::FromRow, serde::Deserialize, serde::Serialize, Debug)]
 pub struct Usuario {
@@ -38,7 +39,7 @@ pub struct Usuario {
     #[serde(skip_serializing)]
     pub idwallet: Option<String>,
 
-    #[serde(default = "defaultTipoUsuario")]
+    #[serde(default)]
     pub tipousuario: TipoUsuario
 }
 
