@@ -49,7 +49,11 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
 pub async fn registro(State(appState): State<appState::AppState>, Json(mut payload): Json<Usuario>) -> impl IntoResponse {
     let dbState = appState.dbState;
 
-    payload.hashcontrasenna = payload.generatePwd().await;
+    if payload.tipousuario.is_none() {
+        return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be anotated.")));
+    }
+
+    payload.contrasenna = payload.generatePwd().await;
     let res = payload.guardarUsuario(dbState.dbPool.as_ref().unwrap()).await;
 
     return match res {
@@ -80,7 +84,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let usuario: Usuario = usuario.unwrap();
 
     //usuario.hashContrasenna currently contains the PHC
-    let validPwd = payload.validatePwd(usuario.hashcontrasenna).await;
+    let validPwd = payload.validatePwd(usuario.contrasenna).await;
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));

@@ -5,7 +5,7 @@ CREATE TABLE Usuario(
     email TEXT UNIQUE NOT NULL,
     nombreCompleto TEXT NOT NULL,
     nombreUsuario TEXT UNIQUE NOT NULL,
-    hashContrasenna TEXT NOT NULL,
+    contrasenna TEXT NOT NULL,
     idWallet TEXT,
     tipoUsuario tiposusuario NOT NULL
 );

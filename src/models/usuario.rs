@@ -6,23 +6,19 @@ use argon2::{
     Argon2
 };
 
-#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug)]
+#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug, Default)]
 #[sqlx(type_name = "tiposusuario", rename_all = "lowercase")]
 pub enum TipoUsuario {
+    #[default]
     Prestatario,
     Prestamista,
     Administrador
 }
 
-impl Default for TipoUsuario {
-    fn default() -> Self {
-        TipoUsuario::Prestatario
-    }
-}
-
-#[derive(sqlx::FromRow, serde::Deserialize, serde::Serialize, Debug)]
+#[derive(sqlx::FromRow, serde::Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip_deserializing)]
     pub id: i32,
 
     #[serde(default)]
@@ -33,19 +29,16 @@ pub struct Usuario {
 
     pub nombreusuario: String,
 
-    #[serde(skip_serializing, alias="contrasenna")]
-    pub hashcontrasenna: String,
+    pub contrasenna: String,
 
-    #[serde(skip_serializing)]
     pub idwallet: Option<String>,
 
-    #[serde(default)]
-    pub tipousuario: TipoUsuario
+    pub tipousuario: Option<TipoUsuario>
 }
 
 impl Usuario {
     pub async fn generatePwd(&self) -> String {
-        let pwd = self.hashcontrasenna.clone();
+        let pwd = self.contrasenna.clone();
         let res = tokio::task::spawn_blocking(move || {
             let salt = SaltString::generate(&mut OsRng);
             return Argon2::default().hash_password(pwd.as_bytes(), &salt).unwrap().to_string();
@@ -55,7 +48,7 @@ impl Usuario {
     }
 
     pub async fn validatePwd(&self, PHC: String) -> bool {
-        let pwd = self.hashcontrasenna.clone();
+        let pwd = self.contrasenna.clone();
         let res = tokio::task::spawn_blocking(move || {
             let parsed_hash = PasswordHash::new(&PHC).unwrap();
             return Argon2::default().verify_password(pwd.as_bytes(), &parsed_hash).is_ok();
@@ -74,13 +67,13 @@ impl Usuario {
     }
     
     pub async fn guardarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, hashcontrasenna, idwallet, tipousuario) VALUES($1, $2, $3, $4, $5, $6)")
+        let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, contrasenna, idwallet, tipousuario) VALUES($1, $2, $3, $4, $5, $6)")
             .bind(&self.email)
             .bind(&self.nombrecompleto)
             .bind(&self.nombreusuario)
-            .bind(&self.hashcontrasenna)
+            .bind(&self.contrasenna)
             .bind(&self.idwallet)
-            .bind(&self.tipousuario as &TipoUsuario)
+            .bind(self.tipousuario.as_ref().unwrap() as &TipoUsuario)
             .execute(dbPool)
             .await;
         return res;
