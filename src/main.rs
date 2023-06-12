@@ -5,6 +5,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
 use loanMeWebapi::services::*;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -40,9 +41,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
         .nest("/api", api)
+        .layer(CorsLayer::permissive())
         .fallback(endpoints::pageNotFound);
 
-    let addr: SocketAddr = SocketAddr::from(([127,0,0,1], 4433));
+    let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(
         std::env::var("TLS_CERT_PATH").unwrap(),
         std::env::var("TLS_KEY_PATH").unwrap()
