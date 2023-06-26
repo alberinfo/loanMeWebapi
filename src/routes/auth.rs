@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
+use std::collections::HashMap;
+
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
 
 use crate::services::appState;
@@ -46,15 +48,21 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn registro(State(appState): State<appState::AppState>, Json(mut payload): Json<Usuario>) -> impl IntoResponse {
+pub async fn registro(State(appState): State<appState::AppState>, Json(mut payload): Json<HashMap<String, Usuario>>) -> impl IntoResponse {
     let dbState = appState.dbState;
 
-    if payload.tipousuario.is_none() {
+    if !payload.contains_key("Usuario") {
+        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
+    }
+
+    let usuario: &mut Usuario = payload.get_mut("Usuario").unwrap();
+
+    if usuario.tipousuario.is_none() {
         return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be anotated.")));
     }
 
-    payload.contrasenna = payload.generatePwd().await;
-    let res = payload.guardarUsuario(dbState.dbPool.as_ref().unwrap()).await;
+    usuario.contrasenna = usuario.generatePwd().await;
+    let res = usuario.guardarUsuario(dbState.dbPool.as_ref().unwrap()).await;
 
     return match res {
         Ok(r) => match r.rows_affected() {
@@ -67,11 +75,17 @@ pub async fn registro(State(appState): State<appState::AppState>, Json(mut paylo
     };
 }
 
-pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<Usuario>) -> impl IntoResponse {
+pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<HashMap<String,Usuario>>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
-    
-    let usuario = payload.buscarUsuario(dbPool).await;
+
+    if !payload.contains_key("Usuario") {
+        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
+    }
+
+    let usrPayload = payload.get("Usuario").unwrap();
+
+    let usuario = usrPayload.buscarUsuario(dbPool).await;
 
     if usuario.is_err() {
         match usuario.unwrap_err() {
@@ -84,7 +98,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let usuario: Usuario = usuario.unwrap();
 
     //usuario.hashContrasenna currently contains the PHC
-    let validPwd = payload.validatePwd(usuario.contrasenna).await;
+    let validPwd = usrPayload.validatePwd(usuario.contrasenna).await;
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));

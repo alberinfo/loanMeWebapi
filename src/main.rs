@@ -5,7 +5,7 @@ use axum_server::tls_rustls::RustlsConfig;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
 use loanMeWebapi::services::*;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
