@@ -61,8 +61,8 @@ pub async fn registro(State(appState): State<appState::AppState>, Json(mut paylo
         return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be anotated.")));
     }
 
-    usuario.contrasenna = usuario.generatePwd().await;
-    let res = usuario.guardarUsuario(dbState.dbPool.as_ref().unwrap()).await;
+    let _ = usuario.generatePwd().await;
+    let res = usuario.crearUsuario(dbState.dbPool.as_ref().unwrap()).await;
 
     return match res {
         Ok(r) => match r.rows_affected() {
@@ -144,5 +144,31 @@ pub async fn logout(State(mut appState): State<appState::AppState>, headers: hea
     return match res {
         Ok(_) => Ok(String::from("Done")),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    };
+}
+
+pub async fn changePwd(State(appState): State<appState::AppState>, Json((mut payload, newPwd)): Json<(HashMap<String, Usuario>, String)>) -> impl IntoResponse {
+    let dbPool = appState.dbState.getConnection().unwrap();
+
+    if !payload.contains_key("Usuario") {
+        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
+    }
+
+    let usuario: &mut Usuario = payload.get_mut("Usuario").unwrap();
+
+    let validPwd = usuario.validatePwd(usuario.contrasenna.clone()).await;
+
+    if !validPwd {
+        return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
+    }
+
+    usuario.contrasenna = newPwd;
+    let _ = usuario.generatePwd().await;
+
+    let res = usuario.actualizarUsuario(dbPool).await;
+
+    return match res {
+        Ok(_r) => Ok(String::from("DONE")),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
     };
 }

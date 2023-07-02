@@ -31,6 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/registro", post(auth::registro))
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
+        .route("/changepwd", post(auth::changePwd))
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 
