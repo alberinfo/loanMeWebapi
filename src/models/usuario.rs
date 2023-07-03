@@ -21,7 +21,7 @@ pub enum TipoUsuario {
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
     #[serde(skip_deserializing)]
-    pub id: i32,
+    pub id: i64,
 
     #[serde(default)]
     pub email: String,
