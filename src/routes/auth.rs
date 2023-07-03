@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
 
-use crate::services::appState;
+use crate::{services::appState, models::PerfilCrediticio::PerfilCrediticio, models::userInput::userInput};
 use crate::models::{usuario::Usuario, session::Session};
 
 pub async fn validationLayer(State(mut appState): State<appState::AppState>, req: Request<axum::body::Body>, next: Next<axum::body::Body>) -> Response {
@@ -48,21 +48,35 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn registro(State(appState): State<appState::AppState>, Json(mut payload): Json<HashMap<String, Usuario>>) -> impl IntoResponse {
-    let dbState = appState.dbState;
+pub async fn registro(State(appState): State<appState::AppState>, Json(payload): Json<userInput>) -> impl IntoResponse {
+    let dbPool = appState.dbState.getConnection().unwrap();
 
-    if !payload.contains_key("Usuario") {
-        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
+    if payload.perfil.is_none() {
+        return Err((StatusCode::BAD_REQUEST, String::from("Credit history has to be anotated")));
     }
 
-    let usuario: &mut Usuario = payload.get_mut("Usuario").unwrap();
+    let mut usuario = payload.Usuario;
+    let mut PerfilCrediticio = payload.perfil.unwrap();
 
     if usuario.tipousuario.is_none() {
         return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be anotated.")));
     }
 
     let _ = usuario.generatePwd().await;
-    let res = usuario.crearUsuario(dbState.dbPool.as_ref().unwrap()).await;
+    let res = usuario.crearUsuario(dbPool).await;
+
+    match res {
+        Ok(r) => match r.rows_affected() {
+            0 => return Err((StatusCode::BAD_REQUEST, String::from("There was an error while creating the user"))),
+            1 => {},
+            _ => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("This should not have happened.")))
+        },
+
+        Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
+    }
+
+    PerfilCrediticio.fkUsuario = usuario.getUserId(dbPool).await.unwrap();
+    let res = PerfilCrediticio.save(dbPool).await;
 
     return match res {
         Ok(r) => match r.rows_affected() {
@@ -71,21 +85,15 @@ pub async fn registro(State(appState): State<appState::AppState>, Json(mut paylo
             _ => Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("This should not have happened.")))
         },
 
-        Err(r) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
+        Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
     };
 }
 
-pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<HashMap<String,Usuario>>) -> impl IntoResponse {
+pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<userInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
 
-    if !payload.contains_key("Usuario") {
-        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
-    }
-
-    let usrPayload = payload.get("Usuario").unwrap();
-
-    let usuario = usrPayload.buscarUsuario(dbPool).await;
+    let usuario = payload.Usuario.buscarUsuario(dbPool).await;
 
     if usuario.is_err() {
         match usuario.unwrap_err() {
@@ -98,7 +106,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let usuario: Usuario = usuario.unwrap();
 
     //usuario.hashContrasenna currently contains the PHC
-    let validPwd = usrPayload.validatePwd(usuario.contrasenna).await;
+    let validPwd = payload.Usuario.validatePwd(usuario.contrasenna).await;
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
@@ -147,14 +155,10 @@ pub async fn logout(State(mut appState): State<appState::AppState>, headers: hea
     };
 }
 
-pub async fn changePwd(State(appState): State<appState::AppState>, Json((mut payload, newPwd)): Json<(HashMap<String, Usuario>, String)>) -> impl IntoResponse {
+pub async fn changePwd(State(appState): State<appState::AppState>, Json((mut payload, newPwd)): Json<(userInput, String)>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
-    if !payload.contains_key("Usuario") {
-        return Err((StatusCode::BAD_REQUEST, String::from("No user object provided")));
-    }
-
-    let usuario: &mut Usuario = payload.get_mut("Usuario").unwrap();
+    let usuario: &mut Usuario = &mut payload.Usuario;
 
     let validPwd = usuario.validatePwd(usuario.contrasenna.clone()).await;
 

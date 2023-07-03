@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .layer(CorsLayer::permissive())
         .fallback(endpoints::pageNotFound);
 
-    let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
+    /*let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(
         std::env::var("TLS_CERT_PATH").unwrap(),
         std::env::var("TLS_KEY_PATH").unwrap()
@@ -54,6 +54,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .unwrap();
     
     axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();*/
+
+    axum::Server::bind(&"0.0.0.0:4433".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
