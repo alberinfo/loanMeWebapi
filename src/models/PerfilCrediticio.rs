@@ -38,4 +38,16 @@ impl PerfilCrediticio {
             .await;
         return res;
     }
+
+    pub async fn update(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
+        let res = sqlx::query("UPDATE perfilcrediticio SET historialcrediticio = $1, extractobancario = $2, comprobantedeingreso = $3, descripcionfinanciera = $4 WHERE id = $4")
+            .bind(&self.historialcrediticio)
+            .bind(&self.extractobancario)
+            .bind(&self.comprobantedeingreso)
+            .bind(&self.descripcionfinanciera)
+            .bind(&self.id)
+            .execute(dbPool)
+            .await;
+        return res;
+    }
 }

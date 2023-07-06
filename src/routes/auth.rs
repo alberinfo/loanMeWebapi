@@ -177,7 +177,7 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
     }
 
     usuario.contrasenna = payload.extra.get("newPwd").unwrap().as_str().unwrap().to_string();
-    println!("nueva contra {}", usuario.contrasenna);
+
     let _ = usuario.generatePwd().await;
 
     let res = usuario.actualizarUsuario(dbPool).await;
