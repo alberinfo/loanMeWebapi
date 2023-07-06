@@ -152,38 +152,3 @@ pub async fn logout(State(mut appState): State<appState::AppState>, headers: hea
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     };
 }
-
-pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
-    let dbPool = appState.dbState.getConnection().unwrap();
-
-    let usuario = payload.Usuario.buscarUsuario(dbPool).await;
-    if usuario.is_err() {
-        match usuario.unwrap_err() {
-            //no se encontro el usuario
-            sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
-            x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
-        }
-    }
-    let mut usuario = usuario.unwrap();
-
-    let validPwd = payload.Usuario.validatePwd(usuario.contrasenna.clone()).await;
-
-    if !validPwd {
-        return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
-    }
-
-    if !payload.extra.contains_key("newPwd") {
-        return Err((StatusCode::BAD_REQUEST, String::from("new password has to be provided")));
-    }
-
-    usuario.contrasenna = payload.extra.get("newPwd").unwrap().as_str().unwrap().to_string();
-
-    let _ = usuario.generatePwd().await;
-
-    let res = usuario.actualizarUsuario(dbPool).await;
-
-    return match res {
-        Ok(_r) => Ok(String::from("DONE")),
-        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
-    };
-}
