@@ -1,11 +1,9 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use std::collections::HashMap;
-
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
 
-use crate::{services::appState, models::PerfilCrediticio::PerfilCrediticio, models::userInput::userInput};
+use crate::{services::appState, models::userInput::UserInput};
 use crate::models::{usuario::Usuario, session::Session};
 
 pub async fn validationLayer(State(mut appState): State<appState::AppState>, req: Request<axum::body::Body>, next: Next<axum::body::Body>) -> Response {
@@ -48,7 +46,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn registro(State(appState): State<appState::AppState>, Json(payload): Json<userInput>) -> impl IntoResponse {
+pub async fn registro(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
@@ -89,7 +87,7 @@ pub async fn registro(State(appState): State<appState::AppState>, Json(payload):
     };
 }
 
-pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<userInput>) -> impl IntoResponse {
+pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
 
@@ -155,18 +153,31 @@ pub async fn logout(State(mut appState): State<appState::AppState>, headers: hea
     };
 }
 
-pub async fn changePwd(State(appState): State<appState::AppState>, Json((mut payload, newPwd)): Json<(userInput, String)>) -> impl IntoResponse {
+pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
-    let usuario: &mut Usuario = &mut payload.Usuario;
+    let usuario = payload.Usuario.buscarUsuario(dbPool).await;
+    if usuario.is_err() {
+        match usuario.unwrap_err() {
+            //no se encontro el usuario
+            sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
+            x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
+        }
+    }
+    let mut usuario = usuario.unwrap();
 
-    let validPwd = usuario.validatePwd(usuario.contrasenna.clone()).await;
+    let validPwd = payload.Usuario.validatePwd(usuario.contrasenna.clone()).await;
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
     }
 
-    usuario.contrasenna = newPwd;
+    if !payload.extra.contains_key("newPwd") {
+        return Err((StatusCode::BAD_REQUEST, String::from("new password has to be provided")));
+    }
+
+    usuario.contrasenna = payload.extra.get("newPwd").unwrap().as_str().unwrap().to_string();
+    println!("nueva contra {}", usuario.contrasenna);
     let _ = usuario.generatePwd().await;
 
     let res = usuario.actualizarUsuario(dbPool).await;
