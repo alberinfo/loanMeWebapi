@@ -26,19 +26,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
         redisState: rdState
     };
 
+    let loans: Router = axum::Router::new()
+        .route("/getLoanOffers", get(loans::))
+
     //All routes nested under /auth (i.e /auth/login)
-    let auth: Router = axum::Router::new()
-        .route("/registro", post(auth::registro))
+    let auth: Router<appState::AppState, _> = axum::Router::new()
+        .route("/register", post(auth::register))
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
         .route("/changepwd", patch(profile::changePwd))
-        .route("/changecredit", patch(profile::changeCredit))
-        .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
-        .with_state(appState);
+        .route("/changecredit", patch(profile::changeCredit));
 
     //Al routes nested under /api (i.e, /auth/*)
     let api: Router = axum::Router::new()
-        .nest("/auth", auth);
+        .nest("/auth", auth)
+        .nest("/loans")
+        .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
+        .with_state(appState);
 
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
@@ -46,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .layer(CorsLayer::permissive())
         .fallback(endpoints::pageNotFound);
 
-    /*let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
+    let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(
         std::env::var("TLS_CERT_PATH").unwrap(),
         std::env::var("TLS_KEY_PATH").unwrap()
@@ -57,12 +61,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service())
         .await
-        .unwrap();*/
+        .unwrap();
 
-    axum::Server::bind(&"0.0.0.0:4433".parse().unwrap())
+    /*axum::Server::bind(&"0.0.0.0:4433".parse().unwrap())
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .unwrap();*/
 
     Ok(())
 }

@@ -11,7 +11,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
 
     let current_path = &req.uri().path().to_string();
 
-    let skip_paths = vec!["/registro", "/login"]; //Añadir caminos a medida que sea necesario.
+    let skip_paths = vec!["/register", "/login"]; //Añadir caminos a medida que sea necesario.
     for skip_path in skip_paths {
         if current_path.ends_with(skip_path) {
             return next.run(req).await;
@@ -46,7 +46,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn registro(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
+pub async fn register(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     if payload.perfil.is_none() {

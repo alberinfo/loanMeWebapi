@@ -37,4 +37,8 @@ impl dbState {
         }
         return Ok(());
     }
+
+    pub async fn getAllLoan(&self, tableName: String) -> sqlx::Result<_> {
+        let data: 
+    }
 }
