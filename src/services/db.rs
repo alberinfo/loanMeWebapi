@@ -2,6 +2,7 @@
 #![allow(clippy::needless_return)]
 
 use sqlx::{postgres::PgRow, Row, Column};
+use crate::models::Prestamo;
 
 #[derive(Clone)]
 pub struct dbState {
@@ -36,9 +37,5 @@ impl dbState {
             sqlx::migrate!("./migrations").run(self.dbPool.as_ref().unwrap()).await?;
         }
         return Ok(());
-    }
-
-    pub async fn getAllLoanOffers(&self, tableName: String) -> sqlx::Result<_> {
-        //Get all Prestamos where fkPrestatario = null
     }
 }

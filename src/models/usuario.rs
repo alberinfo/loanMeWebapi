@@ -63,11 +63,20 @@ impl Usuario {
     }
 
     pub async fn buscarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
-        let usuario: sqlx::Result<Usuario>  = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE nombreusuario = $1")
+        let usuario: sqlx::Result<Usuario> = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE nombreusuario = $1")
             .bind(&self.nombreusuario)
             .fetch_one(dbPool)
             .await;
     
+        return usuario;
+    }
+
+    pub async fn buscarUsuarioById(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
+        let usuario: sqlx::Result<Usuario> = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE id = $1")
+            .bind(&self.id)
+            .fetch_one(dbPool)
+            .await;
+
         return usuario;
     }
     

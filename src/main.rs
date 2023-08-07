@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         redisState: rdState
     };
 
-    let loans: Router<appState::AppState, _> = axum::Router::new();
+    //let loans: Router<appState::AppState, _> = axum::Router::new();
         //.route("/getLoanOffers", get(loans::))
 
     let profile: Router<appState::AppState, _> = axum::Router::new()
@@ -43,17 +43,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api: Router = axum::Router::new()
         .nest("/auth", auth)
         .nest("/profile", profile)
-        .nest("/loans", loans)
+        //.nest("/loans", loans)
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
         .nest("/api", api)
-        .layer(CorsLayer::permissive())
+        .layer(CorsLayer::very_permissive())
         .fallback(endpoints::pageNotFound);
 
-    let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
+    /*let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(
         std::env::var("TLS_CERT_PATH").unwrap(),
         std::env::var("TLS_KEY_PATH").unwrap()
@@ -64,12 +64,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     axum_server::bind_rustls(addr, config)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .unwrap();*/
 
-    /*axum::Server::bind(&"0.0.0.0:4433".parse().unwrap())
+    axum::Server::bind(&"0.0.0.0:4433".parse().unwrap())
         .serve(app.into_make_service())
         .await
-        .unwrap();*/
+        .unwrap();
 
     Ok(())
 }
