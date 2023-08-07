@@ -38,7 +38,7 @@ impl dbState {
         return Ok(());
     }
 
-    pub async fn getAllLoan(&self, tableName: String) -> sqlx::Result<_> {
-        let data: 
+    pub async fn getAllLoanOffers(&self, tableName: String) -> sqlx::Result<_> {
+        //Get all Prestamos where fkPrestatario = null
     }
 }

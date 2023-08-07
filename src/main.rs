@@ -26,21 +26,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         redisState: rdState
     };
 
-    let loans: Router = axum::Router::new()
-        .route("/getLoanOffers", get(loans::))
+    let loans: Router<appState::AppState, _> = axum::Router::new();
+        //.route("/getLoanOffers", get(loans::))
+
+    let profile: Router<appState::AppState, _> = axum::Router::new()
+        .route("/changepwd", patch(profile::changePwd))
+        .route("/changecredit", patch(profile::changeCredit));
 
     //All routes nested under /auth (i.e /auth/login)
     let auth: Router<appState::AppState, _> = axum::Router::new()
         .route("/register", post(auth::register))
         .route("/login", post(auth::login))
-        .route("/logout", post(auth::logout))
-        .route("/changepwd", patch(profile::changePwd))
-        .route("/changecredit", patch(profile::changeCredit));
+        .route("/logout", post(auth::logout));
 
     //Al routes nested under /api (i.e, /auth/*)
     let api: Router = axum::Router::new()
         .nest("/auth", auth)
-        .nest("/loans")
+        .nest("/profile", profile)
+        .nest("/loans", loans)
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 

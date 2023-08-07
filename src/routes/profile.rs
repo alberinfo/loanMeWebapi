@@ -5,7 +5,6 @@ use axum::{http::{StatusCode}, response::{IntoResponse}, Json, extract::State};
 
 use crate::{services::appState, models::userInput::UserInput};
 
-
 pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 

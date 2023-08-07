@@ -17,10 +17,10 @@ pub enum TipoUsuario {
     Administrador
 }
 
-#[derive(sqlx::FromRow, serde::Deserialize, Debug)]
+#[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip_deserializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub id: i64,
 
     #[serde(default)]
