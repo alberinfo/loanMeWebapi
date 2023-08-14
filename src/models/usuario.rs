@@ -8,7 +8,7 @@ use argon2::{
 
 use sqlx::{Row, Column};
 
-#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug, Default)]
+#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug, Default, PartialEq)]
 #[sqlx(type_name = "tiposusuario", rename_all = "lowercase")]
 pub enum TipoUsuario {
     #[default]

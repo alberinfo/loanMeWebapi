@@ -26,8 +26,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         redisState: rdState
     };
 
-    //let loans: Router<appState::AppState, _> = axum::Router::new();
-        //.route("/getLoanOffers", get(loans::))
+    let loans: Router<appState::AppState, _> = axum::Router::new()
+        .route("/getLoanOffers", get(loans::getLoanOffers));
 
     let profile: Router<appState::AppState, _> = axum::Router::new()
         .route("/changepwd", patch(profile::changePwd))
