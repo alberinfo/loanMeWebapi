@@ -3,7 +3,7 @@
 
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
 
-use crate::{services::appState, models::userInput::UserInput};
+use crate::{services::appState, models::InputTypes::InputPerfilCrediticio};
 use crate::models::{usuario::Usuario, session::Session};
 
 pub async fn validationLayer(State(mut appState): State<appState::AppState>, req: Request<axum::body::Body>, next: Next<axum::body::Body>) -> Response {
@@ -46,7 +46,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn register(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
+pub async fn register(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
@@ -73,7 +73,7 @@ pub async fn register(State(appState): State<appState::AppState>, Json(payload):
         Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
     }
 
-    PerfilCrediticio.fkUsuario = usuario.getUserId(dbPool).await.unwrap();
+    PerfilCrediticio.fkusuario = usuario.getUserId(dbPool).await.unwrap();
     let res = PerfilCrediticio.save(dbPool).await;
 
     return match res {
@@ -87,7 +87,7 @@ pub async fn register(State(appState): State<appState::AppState>, Json(payload):
     };
 }
 
-pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
+pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
 

@@ -31,6 +31,7 @@ pub struct Usuario {
 
     pub nombreusuario: String,
 
+    #[serde(skip_serializing)]
     pub contrasenna: String,
 
     pub idwallet: Option<String>,

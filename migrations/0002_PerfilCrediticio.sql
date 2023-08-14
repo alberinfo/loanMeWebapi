@@ -5,5 +5,5 @@ CREATE TABLE PerfilCrediticio(
     HistorialCrediticio TEXT,
     ExtractoBancario TEXT,
     ComprobanteDeIngreso TEXT,
-    DecripcionFinanciera TEXT
+    DescripcionFinanciera TEXT
 )

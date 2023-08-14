@@ -1,11 +1,68 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use axum::{http::{StatusCode}, response::{IntoResponse}, Json, extract::State};
+use std::collections::HashMap;
 
-use crate::{services::appState, models::userInput::UserInput};
+use axum::{http::{StatusCode, header}, response::{IntoResponse}, Json, extract::State};
 
-pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
+use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::Usuario, PerfilCrediticio::PerfilCrediticio}};
+
+//Reads current user info
+pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
+    let dbPool = appState.dbState.getConnection().unwrap();
+    let redisConn = appState.redisState.getConnection().unwrap();
+    
+    let session = Session {
+        username: String::from(""),
+        id: headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(), //in auth.rs we already confirmed header is Some(value)
+        creationDate: None
+    };
+    
+    let res = session.getSessionUserById(redisConn).await;
+
+    if res.is_err() {
+        let err = res.err().unwrap();
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    }
+
+    let user = Usuario {
+        id: 0,
+        email: String::from(""),
+        nombrecompleto: String::from(""),
+        nombreusuario: res.unwrap(),
+        contrasenna: String::from(""),
+        idwallet: None,
+        tipousuario: None
+    };
+
+    let res = user.buscarUsuario(dbPool).await;
+    
+    if res.is_err() {
+        let err = res.err().unwrap();
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+    }
+
+    let user = res.unwrap();
+
+    let res = PerfilCrediticio::get(user.id, dbPool).await;
+
+    if res.is_err() {
+        let err = res.err().unwrap();
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
+    }
+
+    let perfilCrediticio = res.unwrap();
+
+    let response = InputPerfilCrediticio {
+        Usuario: user,
+        perfil: Some(perfilCrediticio),
+        extra: HashMap::new()
+    };
+
+    return Ok(Json(response));
+}
+
+pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     let usuario = payload.Usuario.buscarUsuario(dbPool).await;
@@ -40,7 +97,7 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
     };
 }
 
-pub async fn changeCredit(State(appState): State<appState::AppState>, Json(payload): Json<UserInput>) -> impl IntoResponse {
+pub async fn changeCredit(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
@@ -48,7 +105,7 @@ pub async fn changeCredit(State(appState): State<appState::AppState>, Json(paylo
     }
     let payloadPerfil = payload.perfil.unwrap();
 
-    let credit = payloadPerfil.get(dbPool).await;
+    let credit = PerfilCrediticio::get(payloadPerfil.fkusuario, dbPool).await;
     if credit.is_err() {
         match credit.unwrap_err() {
             //no se encontro el usuario

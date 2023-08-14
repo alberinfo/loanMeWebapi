@@ -1,5 +1,5 @@
 pub mod usuario;
 pub mod session;
 pub mod PerfilCrediticio;
-pub mod userInput;
+pub mod InputTypes;
 pub mod Prestamo;

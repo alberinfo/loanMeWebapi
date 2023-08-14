@@ -27,9 +27,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let loans: Router<appState::AppState, _> = axum::Router::new()
-        .route("/getLoanOffers", get(loans::getLoanOffers));
+        .route("/getLoanOffers", get(loans::getLoanOffers))
+        .route("/getLoanRequests", get(loans::getLoanRequests))
+        .route("/getLoanById", get(loans::getLoanById))
+        .route("/createLoanOffer", post(loans::createLoanOffer))
+        .route("/createLoanRequest", post(loans::createLoanRequest));
 
     let profile: Router<appState::AppState, _> = axum::Router::new()
+        .route("/getUserInfo", get(profile::getUserInfo))
         .route("/changepwd", patch(profile::changePwd))
         .route("/changecredit", patch(profile::changeCredit));
 
@@ -43,14 +48,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api: Router = axum::Router::new()
         .nest("/auth", auth)
         .nest("/profile", profile)
-        //.nest("/loans", loans)
+        .nest("/loans", loans)
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
         .nest("/api", api)
-        .layer(CorsLayer::very_permissive())
+        .layer(CorsLayer::permissive())
         .fallback(endpoints::pageNotFound);
 
     /*let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));

@@ -20,7 +20,7 @@ pub enum LoanError {
     }
 }
 
-#[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Default)]
+#[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Default, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Prestamo {
     #[serde(skip_serializing, skip_deserializing)]
@@ -48,9 +48,9 @@ impl Prestamo {
         return Ok(data);
     }
 
-    pub async fn getLoanById(&self, dbPool: &sqlx::PgPool) -> Result<Prestamo, LoanError> {
+    pub async fn getLoanById(id: i64, dbPool: &sqlx::PgPool) -> Result<Prestamo, LoanError> {
         let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE ID = $1")
-            .bind(self.id)
+            .bind(&id)
             .fetch_one(dbPool)
             .await?;
         return Ok(data);
