@@ -66,7 +66,7 @@ impl Prestamo {
             }
         }
 
-        let result = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestamista) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestamista) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
@@ -89,7 +89,7 @@ impl Prestamo {
             }
         }
 
-        let result = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestatario) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestatario) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)

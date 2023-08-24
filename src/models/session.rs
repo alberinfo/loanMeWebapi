@@ -34,8 +34,8 @@ impl Session {
     }
 
     //TTL = Time to live
-    pub async fn getTTL(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<i64> {
-        return redisConn.ttl(format!("{}{}", "sessionId", self.id)).await;
+    pub async fn getTTL(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<i64> {
+        return redisConn.ttl(format!("{}{}", "sessionId", sessionId)).await;
     }
 
     pub async fn createSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
@@ -46,25 +46,25 @@ impl Session {
     }
 
     //Gets the username given the session id
-    pub async fn getSessionUserById(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
-        return redisConn.get::<String, String>(format!("{}{}", "sessionId", self.id)).await;
+    pub async fn getSessionUserById(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
+        return redisConn.get::<String, String>(format!("{}{}", "sessionId", sessionId)).await;
     }
 
-    pub async fn getSessionIdByUsername(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
-        return redisConn.get::<String, String>(format!("{}{}", "sessionUser", self.username)).await;
+    pub async fn getSessionIdByUsername(username: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<String> {
+        return redisConn.get::<String, String>(format!("{}{}", "sessionUser", username)).await;
     }
 
     //Check if user session exists
-    pub async fn verifySessionById(&self, redisConn: &mut redis::aio::ConnectionManager) -> bool {
-        return redisConn.exists(format!("{}{}", "sessionId", self.id)).await.unwrap();
+    pub async fn verifySessionById(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> bool {
+        return redisConn.exists(format!("{}{}", "sessionId", sessionId)).await.unwrap();
     }
 
-    pub async fn verifySessionByUsername(&self, redisConn: &mut redis::aio::ConnectionManager) -> bool {
-        return redisConn.exists(format!("{}{}", "sessionUser", self.username)).await.unwrap();
+    pub async fn verifySessionByUsername(username: &String, redisConn: &mut redis::aio::ConnectionManager) -> bool {
+        return redisConn.exists(format!("{}{}", "sessionUser", username)).await.unwrap();
     }
 
     pub async fn refreshSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
-        let username = self.getSessionUserById(redisConn).await?;
+        let username = Session::getSessionUserById(&self.id, redisConn).await?;
 
         redisConn.expire(format!("{}{}", "sessionId", self.id), DEFAULT_SESSION_EXPIRATION).await?;
         redisConn.expire(format!("{}{}", "sessionUser", username), DEFAULT_SESSION_EXPIRATION).await?;
@@ -73,7 +73,7 @@ impl Session {
 
     //When user logs out, probably.
     pub async fn deleteSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
-        let username = self.getSessionUserById(redisConn).await?;
+        let username = Session::getSessionUserById(&self.id, redisConn).await?;
 
         redisConn.del(format!("{}{}", "sessionId", self.id)).await?;
         redisConn.del(format!("{}{}", "sessionUser", username)).await?;

@@ -11,32 +11,16 @@ use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, sess
 pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConn = appState.redisState.getConnection().unwrap();
-    
-    let session = Session {
-        username: String::from(""),
-        id: headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(), //in auth.rs we already confirmed header is Some(value)
-        creationDate: None
-    };
-    
-    let res = session.getSessionUserById(redisConn).await;
+
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+    let res = Session::getSessionUserById(&sessionId, redisConn).await;
 
     if res.is_err() {
         let err = res.err().unwrap();
         return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     }
 
-    let user = Usuario {
-        id: 0,
-        email: String::from(""),
-        nombrecompleto: String::from(""),
-        nombreusuario: res.unwrap(),
-        contrasenna: String::from(""),
-        idwallet: None,
-        tipousuario: None
-    };
-
-    let res = user.buscarUsuario(dbPool).await;
-    
+    let res = Usuario::buscarUsuario(&res.unwrap(), dbPool).await;
     if res.is_err() {
         let err = res.err().unwrap();
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
@@ -45,7 +29,6 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
     let user = res.unwrap();
 
     let res = PerfilCrediticio::get(user.id, dbPool).await;
-
     if res.is_err() {
         let err = res.err().unwrap();
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
@@ -65,7 +48,7 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
 pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
-    let usuario = payload.Usuario.buscarUsuario(dbPool).await;
+    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
     if usuario.is_err() {
         match usuario.unwrap_err() {
             //no se encontro el usuario

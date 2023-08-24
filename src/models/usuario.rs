@@ -63,27 +63,27 @@ impl Usuario {
         return res.unwrap();
     }
 
-    pub async fn buscarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
+    pub async fn buscarUsuario(nombreusuario: &String, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
         let usuario: sqlx::Result<Usuario> = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE nombreusuario = $1")
-            .bind(&self.nombreusuario)
+            .bind(nombreusuario)
             .fetch_one(dbPool)
             .await;
     
         return usuario;
     }
 
-    pub async fn buscarUsuarioById(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
+    pub async fn buscarUsuarioById(id: &String, dbPool: &sqlx::PgPool) -> sqlx::Result<Usuario> {
         let usuario: sqlx::Result<Usuario> = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE id = $1")
-            .bind(&self.id)
+            .bind(id)
             .fetch_one(dbPool)
             .await;
 
         return usuario;
     }
     
-    pub async fn getUserId(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<i64> {
+    pub async fn getUserId(nombreusuario: &String, dbPool: &sqlx::PgPool) -> sqlx::Result<i64> {
         let row = sqlx::query("SELECT ID FROM usuario WHERE nombreusuario = $1")
-            .bind(&self.nombreusuario)
+            .bind(nombreusuario)
             .fetch_one(dbPool)
             .await;
 
@@ -110,7 +110,7 @@ impl Usuario {
     }
 
     pub async fn actualizarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let usrId = self.getUserId(dbPool).await;
+        let usrId = Usuario::getUserId(&self.nombreusuario, dbPool).await;
 
         let res = sqlx::query("UPDATE usuario SET email = $1, nombreUsuario = $2, contrasenna = $3, idWallet = $4 WHERE ID = $5")
             .bind(&self.email)

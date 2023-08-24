@@ -2,6 +2,7 @@
 
 use axum::{routing::*, middleware};
 use axum_server::tls_rustls::RustlsConfig;
+use loanMeWebapi::models::mail;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
 use loanMeWebapi::services::*;
@@ -17,13 +18,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     pgState.connect().await?;
     pgState.migrateDb().await?; //migrates the database if its empty
     
-
+    
     let mut rdState = redisServer::redisState::default();
     rdState.connect().await?;
 
+
+    let mut mailingState = mailing::mailingState::default();
+    mailingState.connect().await?;
+    let conn = mailingState.getConnection().await.unwrap();
+    println!("lol {}", conn.test_connection().await?);
+
     let appState = appState::AppState {
         dbState: pgState,
-        redisState: rdState
+        redisState: rdState,
+        mailingState: mailingState
     };
 
     let loans: Router<appState::AppState, _> = axum::Router::new()

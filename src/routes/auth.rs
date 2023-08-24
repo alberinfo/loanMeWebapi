@@ -23,16 +23,13 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
         return (StatusCode::BAD_REQUEST, String::from("AUTHORIZATION Header is empty")).into_response();
     }
     
-    let session = Session {
-        username: String::from(""),
-        id: auth_header.unwrap().to_string(),
-        creationDate: None
-    };
-    if !(session.verifySessionById(redisConnection).await) {
+    let sessionId = auth_header.unwrap().to_string(); 
+
+    if !(Session::verifySessionById(&sessionId, redisConnection).await) {
         return (StatusCode::UNAUTHORIZED, String::from("AUTHORIZATION Header is invalid")).into_response();
     }
 
-    let ttl = session.getTTL(redisConnection).await;
+    let ttl = Session::getTTL(&sessionId, redisConnection).await;
     if ttl.is_err() {
         let err = ttl.err().unwrap();
         return (StatusCode::INTERNAL_SERVER_ERROR, format!("Redis error {:?}\n{}", err.kind(), err.detail().unwrap_or("no further detail was provided"))).into_response();
@@ -41,6 +38,11 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
         return (StatusCode::UNAUTHORIZED, String::from("Session has already expired")).into_response();
     }
 
+    let session = Session {
+        username: Session::getSessionUserById(&sessionId, redisConnection).await.unwrap(),
+        id: sessionId,
+        creationDate: None
+    };
     let _ = session.refreshSession(redisConnection).await; //Make sure user's session does not timeout while hes active
 
     return next.run(req).await;
@@ -73,7 +75,7 @@ pub async fn register(State(appState): State<appState::AppState>, Json(payload):
         Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
     }
 
-    PerfilCrediticio.fkusuario = usuario.getUserId(dbPool).await.unwrap();
+    PerfilCrediticio.fkusuario = Usuario::getUserId(&usuario.nombreusuario, dbPool).await.unwrap();
     let res = PerfilCrediticio.save(dbPool).await;
 
     return match res {
@@ -91,7 +93,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
 
-    let usuario = payload.Usuario.buscarUsuario(dbPool).await;
+    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
 
     if usuario.is_err() {
         match usuario.unwrap_err() {
@@ -116,11 +118,11 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
         creationDate: None
     };
 
-    let userHasActiveSession = oldSession.verifySessionByUsername(redisConnection).await;
+    let userHasActiveSession = Session::verifySessionByUsername(&usuario.nombreusuario, redisConnection).await;
 
     //If the user already has an active session, close it.
     if userHasActiveSession {
-        oldSession.id = oldSession.getSessionIdByUsername(redisConnection).await.unwrap();
+        oldSession.id = Session::getSessionIdByUsername(&usuario.nombreusuario, redisConnection).await.unwrap();
         let res = oldSession.deleteSession(redisConnection).await;
         if res.is_err() {
             let err = res.err().unwrap();
