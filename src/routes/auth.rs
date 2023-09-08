@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::State, middleware::Next};
+use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next};
 
-use crate::{services::appState, models::InputTypes::InputPerfilCrediticio};
+use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, mail::{self, Mail}}};
 use crate::models::{usuario::Usuario, session::Session};
 
 pub async fn validationLayer(State(mut appState): State<appState::AppState>, req: Request<axum::body::Body>, next: Next<axum::body::Body>) -> Response {
@@ -11,9 +11,11 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
 
     let current_path = &req.uri().path().to_string();
 
-    let skip_paths = vec!["/register", "/login"]; //Añadir caminos a medida que sea necesario.
+    let skip_paths = vec!["/auth/register", "/auth/login", "/auth/confirmUser"]; //Añadir caminos a medida que sea necesario.
     for skip_path in skip_paths {
-        if current_path.ends_with(skip_path) {
+        println!("ROUTE {}", current_path);
+        println!("skippydoo {}", current_path.starts_with(skip_path));
+        if current_path.starts_with(skip_path) {
             return next.run(req).await;
         }
     }
@@ -30,8 +32,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     }
 
     let ttl = Session::getTTL(&sessionId, redisConnection).await;
-    if ttl.is_err() {
-        let err = ttl.err().unwrap();
+    if let Err(err) = ttl {
         return (StatusCode::INTERNAL_SERVER_ERROR, format!("Redis error {:?}\n{}", err.kind(), err.detail().unwrap_or("no further detail was provided"))).into_response();
     }
     if ttl.unwrap() <= 0 {
@@ -48,8 +49,10 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
     return next.run(req).await;
 }
 
-pub async fn register(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
+pub async fn register(State(mut appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
+    let redisConnection = appState.redisState.getConnection().unwrap();
+    let mailingPool = appState.mailingState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
         return Err((StatusCode::BAD_REQUEST, String::from("Credit history has to be anotated")));
@@ -63,6 +66,7 @@ pub async fn register(State(appState): State<appState::AppState>, Json(payload):
     }
 
     let _ = usuario.generatePwd().await;
+
     let res = usuario.crearUsuario(dbPool).await;
 
     match res {
@@ -75,18 +79,66 @@ pub async fn register(State(appState): State<appState::AppState>, Json(payload):
         Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
     }
 
+
     PerfilCrediticio.fkusuario = Usuario::getUserId(&usuario.nombreusuario, dbPool).await.unwrap();
     let res = PerfilCrediticio.save(dbPool).await;
 
-    return match res {
+    match res {
         Ok(r) => match r.rows_affected() {
-            0 => Err((StatusCode::BAD_REQUEST, String::from("There was an error while creating the user"))),
-            1 => Ok(String::from("Done")),
-            _ => Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("This should not have happened.")))
+            0 => {
+                let _ = usuario.eliminarUsuario(dbPool).await;
+                return Err((StatusCode::BAD_REQUEST, String::from("There was an error while creating the user")))
+            },
+            1 => {},
+            _ => {
+                let _ = usuario.eliminarUsuario(dbPool).await;
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("This should not have happened.")))
+            }
         },
 
         Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
+    }
+
+
+
+    let mut confirmationMail = mail::Mail::SignupConfirm(usuario.clone(), String::from(""));
+    let saveRes = confirmationMail.save(redisConnection).await;
+
+    if let Err(_err) = saveRes {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while saving your data. Contact us for further information")));
+    }
+
+    let sendRes = confirmationMail.send(mailingPool).await;
+
+    return match sendRes {
+        Ok(_r) => Ok(String::from("Done")),
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
     };
+}
+
+pub async fn confirmUser(State(mut appState): State<appState::AppState>, Path(confirmationId): Path<String>) -> impl IntoResponse{
+    let dbPool = appState.dbState.getConnection().unwrap();
+    let redisConnection = appState.redisState.getConnection().unwrap();
+
+    let mail = Mail::get("confirmationId", &confirmationId, redisConnection).await;
+
+    if let Err(err) = mail {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
+    }
+
+    let mail = mail.unwrap();
+
+    if let Mail::SignupConfirm(Usuario, _confirmationId) = mail {
+        let res = Usuario.habilitarUsuario(dbPool).await;
+
+        return match res {
+            Ok(_r) => Ok(String::from("User has been enabled")),
+            Err(_err) => Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There has been an error while activating the user. Contact us for further information")))
+        };
+    }
+
+    //This will not happen.
+    return Ok(String::from(""));
 }
 
 pub async fn login(State(mut appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
@@ -95,8 +147,8 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 
     let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
 
-    if usuario.is_err() {
-        match usuario.unwrap_err() {
+    if let Err(err) = usuario {
+        match err {
             //no se encontro el usuario
             sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
             x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
@@ -104,6 +156,10 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     }
 
     let usuario: Usuario = usuario.unwrap();
+
+    if !usuario.habilitado {
+        return Err((StatusCode::FORBIDDEN, String::from("User should confirm their email before logging in")))
+    }
 
     //usuario.hashContrasenna currently contains the PHC
     let validPwd = payload.Usuario.validatePwd(usuario.contrasenna).await;
@@ -124,8 +180,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     if userHasActiveSession {
         oldSession.id = Session::getSessionIdByUsername(&usuario.nombreusuario, redisConnection).await.unwrap();
         let res = oldSession.deleteSession(redisConnection).await;
-        if res.is_err() {
-            let err = res.err().unwrap();
+        if let Err(err) = res {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
         }
     }

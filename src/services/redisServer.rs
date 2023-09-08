@@ -3,6 +3,8 @@
 #![allow(clippy::needless_return)]
 
 pub static DEFAULT_SESSION_EXPIRATION: usize = 600; //600 secs --> 10 minutes
+pub static DEFAULT_MAILCONF_EXPIRATION: usize = 3600; //3600 secs --> 1 hr
+pub static DEFAULT_PWDRESTORE_EXPIRATION: usize = 900; //900 secs --> 15 minutes
 
 #[derive(Clone)]
 pub struct redisState {

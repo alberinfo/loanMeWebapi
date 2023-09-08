@@ -50,7 +50,7 @@ impl Prestamo {
 
     pub async fn getLoanById(id: i64, dbPool: &sqlx::PgPool) -> Result<Prestamo, LoanError> {
         let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE ID = $1")
-            .bind(&id)
+            .bind(id)
             .fetch_one(dbPool)
             .await?;
         return Ok(data);

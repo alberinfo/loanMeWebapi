@@ -14,24 +14,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     dotenvy::dotenv()?; //load environment vars
 
-    let mut pgState = db::dbState::default();
-    pgState.connect().await?;
-    pgState.migrateDb().await?; //migrates the database if its empty
+    let mut dbState = db::dbState::default();
+    dbState.connect().await?;
+    dbState.migrateDb().await?; //migrates the database if its empty
     
     
-    let mut rdState = redisServer::redisState::default();
-    rdState.connect().await?;
+    let mut redisState = redisServer::redisState::default();
+    redisState.connect().await?;
 
 
     let mut mailingState = mailing::mailingState::default();
     mailingState.connect().await?;
-    let conn = mailingState.getConnection().await.unwrap();
-    println!("lol {}", conn.test_connection().await?);
 
     let appState = appState::AppState {
-        dbState: pgState,
-        redisState: rdState,
-        mailingState: mailingState
+        dbState,
+        redisState,
+        mailingState
     };
 
     let loans: Router<appState::AppState, _> = axum::Router::new()
@@ -49,6 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //All routes nested under /auth (i.e /auth/login)
     let auth: Router<appState::AppState, _> = axum::Router::new()
         .route("/register", post(auth::register))
+        .route("/confirmUser/:confirmationId", post(auth::confirmUser))
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout));
 

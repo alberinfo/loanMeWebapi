@@ -6,9 +6,10 @@ use argon2::{
     Argon2
 };
 
+use axum_server::bind;
 use sqlx::{Row, Column};
 
-#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug, Default, PartialEq)]
+#[derive(sqlx::Type, serde::Deserialize, serde::Serialize, Debug, Default, PartialEq, Clone)]
 #[sqlx(type_name = "tiposusuario", rename_all = "lowercase")]
 pub enum TipoUsuario {
     #[default]
@@ -17,10 +18,10 @@ pub enum TipoUsuario {
     Administrador
 }
 
-#[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub id: i64,
 
     #[serde(default)]
@@ -31,12 +32,14 @@ pub struct Usuario {
 
     pub nombreusuario: String,
 
-    #[serde(skip_serializing)]
     pub contrasenna: String,
 
     pub idwallet: Option<String>,
 
-    pub tipousuario: Option<TipoUsuario>
+    pub tipousuario: Option<TipoUsuario>,
+
+    #[serde(skip)]
+    pub habilitado: bool
 }
 
 impl Usuario {
@@ -97,27 +100,52 @@ impl Usuario {
     }
 
     pub async fn crearUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, contrasenna, idwallet, tipousuario) VALUES($1, $2, $3, $4, $5, $6)")
+        let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, contrasenna, idwallet, tipousuario, habilitado) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.email)
             .bind(&self.nombrecompleto)
             .bind(&self.nombreusuario)
             .bind(&self.contrasenna)
             .bind(&self.idwallet)
             .bind(self.tipousuario.as_ref().unwrap() as &TipoUsuario)
+            .bind(false)
             .execute(dbPool)
             .await;
         return res;
     }
 
     pub async fn actualizarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let usrId = Usuario::getUserId(&self.nombreusuario, dbPool).await;
+        let usrId = Usuario::getUserId(&self.nombreusuario, dbPool).await?;
 
         let res = sqlx::query("UPDATE usuario SET email = $1, nombreUsuario = $2, contrasenna = $3, idWallet = $4 WHERE ID = $5")
             .bind(&self.email)
             .bind(&self.nombreusuario)
             .bind(&self.contrasenna)
             .bind(&self.idwallet)
-            .bind(usrId?)
+            .bind(usrId)
+            .execute(dbPool)
+            .await;
+        return res;
+    }
+
+    pub async fn eliminarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
+        let res = sqlx::query("DELETE FROM usuario WHERE nombreusuario = $1")
+            .bind(&self.nombreusuario)
+            .execute(dbPool)
+            .await;
+        return res;
+    }
+
+    pub async fn habilitarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
+        let res = sqlx::query("UPDATE usuario SET habilitado = true WHERE nombreusuario = $1")
+            .bind(&self.nombreusuario)
+            .execute(dbPool)
+            .await;
+        return res;
+    }
+
+    pub async fn deshabilitarUsuario(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
+        let res = sqlx::query("UPDATE usuario SET habilitado = false WHERE nombreusuario = $1")
+            .bind(&self.nombreusuario)
             .execute(dbPool)
             .await;
         return res;

@@ -1,10 +1,9 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use argon2::password_hash::rand_core::{RngCore, OsRng};
-use sha2::{Sha512, Digest};
 use redis::AsyncCommands;
 use crate::services::redisServer::DEFAULT_SESSION_EXPIRATION;
+use crate::services::misc::generateRnd;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Session {
@@ -17,12 +16,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(user: String) -> Session { //Create a new session for a given user
-        let sessionIdHash = tokio::task::spawn_blocking(|| {
-            let mut buf = [0u8; 32]; //generate 256 bits of entropy
-            OsRng.fill_bytes(&mut buf);
-    
-            return format!("{:X}", Sha512::digest(buf));
-        }).await.unwrap();
+        let sessionIdHash = generateRnd(256).await.unwrap();
 
         let newSession = Session {
             username: user,

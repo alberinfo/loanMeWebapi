@@ -7,5 +7,6 @@ CREATE TABLE Usuario(
     nombreUsuario TEXT UNIQUE NOT NULL,
     contrasenna TEXT NOT NULL,
     idWallet TEXT,
-    tipoUsuario tiposusuario NOT NULL
+    tipoUsuario tiposusuario NOT NULL,
+    habilitado BOOL NOT NULL
 );

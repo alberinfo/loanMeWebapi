@@ -15,22 +15,19 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
     let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
     let res = Session::getSessionUserById(&sessionId, redisConn).await;
 
-    if res.is_err() {
-        let err = res.err().unwrap();
+    if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     }
 
     let res = Usuario::buscarUsuario(&res.unwrap(), dbPool).await;
-    if res.is_err() {
-        let err = res.err().unwrap();
+    if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
     }
 
     let user = res.unwrap();
 
     let res = PerfilCrediticio::get(user.id, dbPool).await;
-    if res.is_err() {
-        let err = res.err().unwrap();
+    if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 
@@ -49,8 +46,8 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
     let dbPool = appState.dbState.getConnection().unwrap();
 
     let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
-    if usuario.is_err() {
-        match usuario.unwrap_err() {
+    if let Err(err) = usuario {
+        match err {
             //no se encontro el usuario
             sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
             x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
@@ -89,8 +86,8 @@ pub async fn changeCredit(State(appState): State<appState::AppState>, Json(paylo
     let payloadPerfil = payload.perfil.unwrap();
 
     let credit = PerfilCrediticio::get(payloadPerfil.fkusuario, dbPool).await;
-    if credit.is_err() {
-        match credit.unwrap_err() {
+    if let Err(err) = credit {
+        match err {
             //no se encontro el usuario
             sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("Credit history does not exist"))),
             x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))

@@ -1,7 +1,7 @@
 #![allow(non_snake_case, non_camel_case_types)]
 #![allow(clippy::needless_return)]
 
-use lettre::{AsyncSmtpTransport, transport::{smtp::{authentication::{Credentials, Mechanism}, PoolConfig, AsyncSmtpTransportBuilder}, self}, Tokio1Executor};
+use lettre::{AsyncSmtpTransport, transport::{smtp::{authentication::{Credentials, Mechanism}, PoolConfig}, self}, Tokio1Executor};
 
 #[derive(Clone)]
 pub struct mailingState {
@@ -16,14 +16,15 @@ impl Default for mailingState {
 
 impl mailingState {
     pub async fn connect(&mut self) -> Result<(), transport::smtp::Error> { //What is the error type?
-        println!("niggeers {}", &std::env::var("SMTP_URL").unwrap());
-        
+        let smtpUsername = &std::env::var("SMTP_USER").unwrap();
+        let smtpPwd = &std::env::var("SMTP_PWD").unwrap();
+
         self.mailingPool = Some(
             AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&std::env::var("SMTP_URL").unwrap())?
             .port(587)
             .credentials(Credentials::new(
-                "x".to_owned(),
-                "x".to_owned()
+                smtpUsername.to_owned(),
+                smtpPwd.to_owned()
             ))
             .authentication(vec![Mechanism::Plain])
             .pool_config(PoolConfig::new().max_size(10))
@@ -33,7 +34,7 @@ impl mailingState {
         return Ok(());
     }
 
-    pub async fn getConnection(&self) -> Option<&AsyncSmtpTransport<Tokio1Executor>> {
+    pub fn getConnection(&self) -> Option<&AsyncSmtpTransport<Tokio1Executor>> {
         return self.mailingPool.as_ref();
     } 
 }

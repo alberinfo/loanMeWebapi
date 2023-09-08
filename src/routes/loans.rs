@@ -12,12 +12,11 @@ pub async fn getLoanOffers(State(appState): State<appState::AppState>) -> impl I
     let dbPool = appState.dbState.getConnection().unwrap();
     let result: Result<Vec<Prestamo>, LoanError> = Prestamo::getAllLoanOffers(dbPool).await;
 
-    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None };
+    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None, habilitado: false };
     //let loaners = vec![defaultUser; result.]
 
     //We know getAllLoanOffers only returns Ok or Err(sqlx::Error)
-    if result.is_err() {
-        let err = result.err().unwrap();
+    if let Err(err) = result {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 
@@ -29,13 +28,12 @@ pub async fn getLoanRequests(State(appState): State<appState::AppState>) -> impl
     let dbPool = appState.dbState.getConnection().unwrap();
     let result: Result<Vec<Prestamo>, LoanError> = Prestamo::getAllLoanRequests(dbPool).await;
 
-    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None };
+    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None, habilitado: false };
     //let loaners = vec![defaultUser; result.]
 
 
     //We know getAllLoanRequests only returns Ok or Err(sqlx::Error)
-    if result.is_err() {
-        let err = result.err().unwrap();
+    if let Err(err) = result {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 
@@ -48,8 +46,7 @@ pub async fn getLoanById(State(appState): State<appState::AppState>, Json(LoanId
 
     let result = Prestamo::getLoanById(LoanId, dbPool).await;
     
-    if result.is_err() {
-        let err = result.err().unwrap();
+    if let Err(err) = result {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 

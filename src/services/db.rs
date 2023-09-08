@@ -2,7 +2,6 @@
 #![allow(clippy::needless_return)]
 
 use sqlx::{postgres::PgRow, Row, Column};
-use crate::models::Prestamo;
 
 #[derive(Clone)]
 pub struct dbState {
