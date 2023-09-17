@@ -42,10 +42,20 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
     return Ok(Json(response));
 }
 
-pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
+pub async fn changePwd(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(newPwd): Json<String>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
+    let redisConn = appState.redisState.getConnection().unwrap();
 
-    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+    let username = Session::getSessionUserById(&sessionId, redisConn).await;
+
+    if let Err(err) = username {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    }
+
+    let username = username.unwrap();
+
+    let usuario = Usuario::buscarUsuario(&username, dbPool).await;
     if let Err(r) = usuario {
         match r {
             UserError::MultithreadError(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while processing your request"))),
@@ -57,7 +67,7 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
     }
     let mut usuario = usuario.unwrap();
 
-    let validPwd = payload.Usuario.validatePwd(usuario.contrasenna.clone()).await;
+    let validPwd = usuario.validatePwd(usuario.contrasenna.clone()).await;
 
     if let Err(r) = validPwd {
         match r {
@@ -72,11 +82,7 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));
     }
 
-    if !payload.extra.contains_key("newPwd") {
-        return Err((StatusCode::BAD_REQUEST, String::from("new password has to be provided")));
-    }
-
-    usuario.contrasenna = payload.extra.get("newPwd").unwrap().as_str().unwrap().to_string();
+    usuario.contrasenna = newPwd.clone();
 
     let _ = usuario.generatePwd().await;
 
@@ -88,15 +94,37 @@ pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload)
     };
 }
 
-pub async fn changeCredit(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
+pub async fn changeCredit(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
+    let redisConn = appState.redisState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
         return Err((StatusCode::BAD_REQUEST, String::from("New credit data has to be provided")));
     }
     let payloadPerfil = payload.perfil.unwrap();
 
-    let credit = PerfilCrediticio::get(payloadPerfil.fkusuario, dbPool).await;
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+    let username = Session::getSessionUserById(&sessionId, redisConn).await;
+
+    if let Err(err) = username {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    }
+
+    let username = username.unwrap();
+
+    let usuario = Usuario::buscarUsuario(&username, dbPool).await;
+    if let Err(r) = usuario {
+        match r {
+            UserError::MultithreadError(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while processing your request"))),
+            UserError::DbError(err) => match err {
+                sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
+                x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
+            }
+        }
+    }
+    let usuario = usuario.unwrap();
+
+    let credit = PerfilCrediticio::get(usuario.id, dbPool).await;
     if let Err(err) = credit {
         match err {
             //no se encontro el usuario
