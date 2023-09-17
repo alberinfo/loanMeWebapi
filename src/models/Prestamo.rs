@@ -23,17 +23,22 @@ pub enum LoanError {
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Default, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Prestamo {
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip_deserializing)]
     pub id: i64,
     pub monto: BigDecimal,
-    pub fechaCreacion: chrono::NaiveDate,
+
+    #[serde(skip_deserializing)]
+    pub fechaCreacion: chrono::NaiveDateTime,
+    
     pub interes: f64,
-    pub plazoPago: chrono::NaiveDate,
+    pub plazoPago: chrono::NaiveDateTime,
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
 
     #[serde(skip_serializing)]
     pub fkPrestatario: Option<i32>,
+
+    #[serde(skip_serializing)]
     pub fkPrestamista: Option<i32>
 }
 
@@ -56,7 +61,7 @@ impl Prestamo {
         return Ok(data);
     }
 
-    pub async fn createLoanOffer(&self, offerer: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn createLoanOffer(&mut self, offerer: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         match offerer.tipousuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
@@ -65,6 +70,8 @@ impl Prestamo {
                 usuario::TipoUsuario::Prestamista => ()
             }
         }
+
+        self.fechaCreacion = chrono::Utc::now().naive_utc();
 
         let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestamista) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
@@ -79,7 +86,7 @@ impl Prestamo {
         return Ok(());
     }
 
-    pub async fn createLoanRequest(&self, requester: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn createLoanRequest(&mut self, requester: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         match requester.tipousuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
@@ -88,6 +95,8 @@ impl Prestamo {
                 usuario::TipoUsuario::Prestatario => ()
             }
         }
+
+        self.fechaCreacion = chrono::Utc::now().naive_utc();
 
         let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestatario) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)

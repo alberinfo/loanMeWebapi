@@ -4,17 +4,15 @@
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next};
 
 use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, mail::{self, Mail}}};
-use crate::models::{usuario::Usuario, session::Session};
+use crate::models::{usuario::Usuario, usuario::UserError, session::Session};
 
 pub async fn validationLayer(State(mut appState): State<appState::AppState>, req: Request<axum::body::Body>, next: Next<axum::body::Body>) -> Response {
     let redisConnection = appState.redisState.getConnection().unwrap();
 
     let current_path = &req.uri().path().to_string();
 
-    let skip_paths = vec!["/auth/register", "/auth/login", "/auth/confirmUser"]; //Añadir caminos a medida que sea necesario.
+    let skip_paths = vec!["/auth/register", "/auth/login", "/auth/confirmUser", "/profile/requestRestorePwd", "/profile/restorePwd"]; //Añadir caminos a medida que sea necesario.
     for skip_path in skip_paths {
-        println!("ROUTE {}", current_path);
-        println!("skippydoo {}", current_path.starts_with(skip_path));
         if current_path.starts_with(skip_path) {
             return next.run(req).await;
         }
@@ -55,14 +53,14 @@ pub async fn register(State(mut appState): State<appState::AppState>, Json(paylo
     let mailingPool = appState.mailingState.getConnection().unwrap();
 
     if payload.perfil.is_none() {
-        return Err((StatusCode::BAD_REQUEST, String::from("Credit history has to be anotated")));
+        return Err((StatusCode::BAD_REQUEST, String::from("Credit history has to be provided")));
     }
 
     let mut usuario = payload.Usuario;
     let mut PerfilCrediticio = payload.perfil.unwrap();
 
     if usuario.tipousuario.is_none() {
-        return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be anotated.")));
+        return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be provided.")));
     }
 
     let _ = usuario.generatePwd().await;
@@ -128,6 +126,7 @@ pub async fn confirmUser(State(mut appState): State<appState::AppState>, Path(co
 
     let mail = mail.unwrap();
 
+    //We do this so that we can access the enum's values
     if let Mail::SignupConfirm(Usuario, _confirmationId) = mail {
         let res = Usuario.habilitarUsuario(dbPool).await;
 
@@ -147,11 +146,13 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 
     let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
 
-    if let Err(err) = usuario {
-        match err {
-            //no se encontro el usuario
-            sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
-            x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
+    if let Err(r) = usuario {
+        match r {
+            UserError::MultithreadError(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while processing your request"))),
+            UserError::DbError(err) => match err {
+                sqlx::Error::RowNotFound => return Err((StatusCode::BAD_REQUEST, String::from("User does not exist"))),
+                x => return Err((StatusCode::INTERNAL_SERVER_ERROR, x.to_string()))
+            }
         }
     }
 
@@ -163,6 +164,15 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 
     //usuario.hashContrasenna currently contains the PHC
     let validPwd = payload.Usuario.validatePwd(usuario.contrasenna).await;
+
+    if let Err(r) = validPwd {
+        match r {
+            UserError::MultithreadError(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while processing your request"))),
+            UserError::DbError(err) => return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+        }
+    }
+
+    let validPwd = validPwd.unwrap();
 
     if !validPwd {
         return Err((StatusCode::UNAUTHORIZED, String::from("Wrong password")));

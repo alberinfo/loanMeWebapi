@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
+use axum::http::header;
 use axum::{response::IntoResponse, Json, extract::State, http::StatusCode};
 
 use crate::models::InputTypes::InputPrestamo;
 use crate::models::Prestamo::*;
+use crate::models::session::Session;
 use crate::models::usuario::Usuario;
 use crate::services::appState;
 
@@ -54,16 +56,29 @@ pub async fn getLoanById(State(appState): State<appState::AppState>, Json(LoanId
     return Ok(Json(result));
 }
 
-pub async fn createLoanOffer(State(appState): State<appState::AppState>, Json(payload): Json<InputPrestamo>) -> impl IntoResponse {
+pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(payload): Json<InputPrestamo>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
-    
-    let loan = payload.Loan;
-    let user = payload.Usuario;
+    let redisConn = appState.redisState.getConnection().unwrap();
+
+    let mut loan = payload.Loan;
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+    let res = Session::getSessionUserById(&sessionId, redisConn).await;
+
+    if let Err(err) = res {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    }
+
+    let res = Usuario::buscarUsuario(&res.unwrap(), dbPool).await;
+    if let Err(err) = res {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+    }
+
+    let user = res.unwrap();
 
     let result = loan.createLoanOffer(user, dbPool).await;
 
     return match result {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok("Done"),
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
@@ -72,16 +87,29 @@ pub async fn createLoanOffer(State(appState): State<appState::AppState>, Json(pa
     }
 }
 
-pub async fn createLoanRequest(State(appState): State<appState::AppState>, Json(payload): Json<InputPrestamo>) -> impl IntoResponse {
+pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(payload): Json<InputPrestamo>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
-    
-    let loan = payload.Loan;
-    let user = payload.Usuario;
+    let redisConn = appState.redisState.getConnection().unwrap();
+
+    let mut loan = payload.Loan;
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
+    let res = Session::getSessionUserById(&sessionId, redisConn).await;
+
+    if let Err(err) = res {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
+    }
+
+    let res = Usuario::buscarUsuario(&res.unwrap(), dbPool).await;
+    if let Err(err) = res {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+    }
+
+    let user = res.unwrap();
 
     let result = loan.createLoanRequest(user, dbPool).await;
 
     return match result {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok("Done"),
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),

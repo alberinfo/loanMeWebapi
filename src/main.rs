@@ -2,7 +2,6 @@
 
 use axum::{routing::*, middleware};
 use axum_server::tls_rustls::RustlsConfig;
-use loanMeWebapi::models::mail;
 use std::{error::Error, net::SocketAddr};
 use loanMeWebapi::routes::*;
 use loanMeWebapi::services::*;
@@ -41,8 +40,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let profile: Router<appState::AppState, _> = axum::Router::new()
         .route("/getUserInfo", get(profile::getUserInfo))
-        .route("/changepwd", patch(profile::changePwd))
-        .route("/changecredit", patch(profile::changeCredit));
+        .route("/changePwd", patch(profile::changePwd))
+        .route("/changeCredit", patch(profile::changeCredit))
+        .route("/requestRestorePwd", post(profile::requestRestorePwd))
+        .route("/restorePwd/:restoreId", put(profile::restorePwd));
 
     //All routes nested under /auth (i.e /auth/login)
     let auth: Router<appState::AppState, _> = axum::Router::new()
@@ -62,8 +63,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //All routes nested under / (i.e, /api/*)
     let app: Router = axum::Router::new()
         .nest("/api", api)
-        .layer(CorsLayer::permissive())
-        .fallback(endpoints::pageNotFound);
+        .fallback(endpoints::pageNotFound)
+        .layer(CorsLayer::very_permissive());
 
     /*let addr: SocketAddr = SocketAddr::from(([0,0,0,0], 4433));
     let config: RustlsConfig = RustlsConfig::from_pem_file(

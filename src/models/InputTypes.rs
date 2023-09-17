@@ -15,7 +15,6 @@ pub struct InputPerfilCrediticio {
 
 #[derive(serde::Deserialize, Debug)]
 pub struct InputPrestamo {
-    pub Usuario: Usuario,
     pub Loan: Prestamo,
 
     #[serde(flatten)]

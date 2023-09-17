@@ -11,17 +11,17 @@ pub struct Session {
     pub username: String, //which user does this session belong to?
     #[serde(rename="sessionId")]
     pub id: String,
-    pub creationDate: Option<chrono::DateTime<chrono::Utc>>
+    pub creationDate: Option<chrono::NaiveDateTime>
 }
 
 impl Session {
     pub async fn new(user: String) -> Session { //Create a new session for a given user
-        let sessionIdHash = generateRnd(256).await.unwrap();
+        let sessionIdHash = generateRnd(64).await.unwrap();
 
         let newSession = Session {
             username: user,
             id: sessionIdHash,
-            creationDate: Some(chrono::Utc::now())
+            creationDate: Some(chrono::Utc::now().naive_utc())
         };
 
         return newSession;
