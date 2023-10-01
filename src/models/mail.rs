@@ -36,12 +36,15 @@ impl Mail {
         match IdType {
             "confirmationId" => {
                 let userJson = redisConn.get_del::<String, String>(format!("{}{}", "confirmationId", id)).await?;
-                let user: Usuario = serde_json::from_str(&userJson).unwrap();
+                let mut user: Usuario = serde_json::from_str(&userJson).unwrap();
+                user.contrasenna.pop(); //remover el "*"
                 return Ok(Mail::SignupConfirm(user, id.to_string()));
             },
             "restoreId" => {
                 let userJson = redisConn.get_del::<String, String>(format!("{}{}", "restoreId", id)).await?;
                 let user: Usuario = serde_json::from_str(&userJson).unwrap();
+                let mut user: Usuario = serde_json::from_str(&userJson).unwrap();
+                user.contrasenna.pop(); //remover el "*"
                 return Ok(Mail::PwdRestore(user, id.to_string()));
             },
             _ => {
@@ -55,10 +58,12 @@ impl Mail {
         match self {
             Mail::SignupConfirm(Usuario, ConfirmationId) => {
                 std::mem::swap(ConfirmationId, &mut generateRnd(64).await.unwrap()); //ConfirmationId = &mut generateRnd(64).await.unwrap();
+                Usuario.contrasenna.push('*');
                 redisConn.set_ex::<String, String, String>(format!("{}{}", "confirmationId", ConfirmationId), serde_json::to_string(Usuario).unwrap(), DEFAULT_MAILCONF_EXPIRATION).await?;
             },
             Mail::PwdRestore(Usuario, RestoreId) => {
                 std::mem::swap(RestoreId, &mut generateRnd(64).await.unwrap()); //RestoreId = &mut generateRnd(64).await.unwrap();
+                Usuario.contrasenna.push('*');
                 redisConn.set_ex::<String, String, String>(format!("{}{}", "restoreId", RestoreId), serde_json::to_string(Usuario).unwrap(), DEFAULT_PWDRESTORE_EXPIRATION).await?;
             },
             Mail::Test => {}

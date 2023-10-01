@@ -26,13 +26,17 @@ pub enum TipoUsuario {
     Administrador
 }
 
+fn shouldSerializePwd(s: &String) -> bool {
+    return s.chars().last().unwrap() != '*';
+}
+
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
     #[serde(skip)]
     pub id: i64,
 
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub email: String,
 
     #[serde(default)]
@@ -40,13 +44,12 @@ pub struct Usuario {
 
     pub nombreUsuario: String,
 
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "shouldSerializePwd")]
     pub contrasenna: String,
 
     #[serde(skip_serializing)]
     pub idWallet: Option<String>,
 
-    #[serde(skip_serializing)]
     pub tipoUsuario: Option<TipoUsuario>,
 
     #[serde(skip)]
