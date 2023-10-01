@@ -59,7 +59,7 @@ pub async fn register(State(mut appState): State<appState::AppState>, Json(paylo
     let mut usuario = payload.Usuario;
     let mut PerfilCrediticio = payload.perfil.unwrap();
 
-    if usuario.tipousuario.is_none() {
+    if usuario.tipoUsuario.is_none() {
         return Err((StatusCode::BAD_REQUEST, String::from("Field TipoUsuario has to be provided.")));
     }
 
@@ -78,7 +78,7 @@ pub async fn register(State(mut appState): State<appState::AppState>, Json(paylo
     }
 
 
-    PerfilCrediticio.fkusuario = Usuario::getUserId(&usuario.nombreusuario, dbPool).await.unwrap();
+    PerfilCrediticio.fkUsuario = Usuario::getUserId(&usuario.nombreUsuario, dbPool).await.unwrap();
     let res = PerfilCrediticio.save(dbPool).await;
 
     match res {
@@ -144,7 +144,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConnection = appState.redisState.getConnection().unwrap();
 
-    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
+    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreUsuario, dbPool).await;
 
     if let Err(r) = usuario {
         match r {
@@ -179,23 +179,23 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     }
 
     let mut oldSession = Session {
-        username: usuario.nombreusuario.clone(),
+        username: usuario.nombreUsuario.clone(),
         id: String::from(""),
         creationDate: None
     };
 
-    let userHasActiveSession = Session::verifySessionByUsername(&usuario.nombreusuario, redisConnection).await;
+    let userHasActiveSession = Session::verifySessionByUsername(&usuario.nombreUsuario, redisConnection).await;
 
     //If the user already has an active session, close it.
     if userHasActiveSession {
-        oldSession.id = Session::getSessionIdByUsername(&usuario.nombreusuario, redisConnection).await.unwrap();
+        oldSession.id = Session::getSessionIdByUsername(&usuario.nombreUsuario, redisConnection).await.unwrap();
         let res = oldSession.deleteSession(redisConnection).await;
         if let Err(err) = res {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
         }
     }
 
-    let nuevaSession = Session::new(usuario.nombreusuario).await;
+    let nuevaSession = Session::new(usuario.nombreUsuario).await;
     let res = nuevaSession.createSession(redisConnection).await;
     return match res {
         Ok(_) => Ok(Json(nuevaSession)),

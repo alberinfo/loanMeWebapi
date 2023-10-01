@@ -3,6 +3,7 @@
 
 use bigdecimal::BigDecimal;
 use super::usuario;
+use crate::services::misc::deserializeNaiveDateTime;
 
 #[derive(thiserror::Error, Debug)]
 pub enum LoanError {
@@ -31,25 +32,27 @@ pub struct Prestamo {
     pub fechaCreacion: chrono::NaiveDateTime,
     
     pub interes: f64,
+
+    #[serde(deserialize_with = "deserializeNaiveDateTime")]
     pub plazoPago: chrono::NaiveDateTime,
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
 
     #[serde(skip_serializing)]
-    pub fkPrestatario: Option<i32>,
+    pub fkPrestatario: Option<i64>,
 
     #[serde(skip_serializing)]
-    pub fkPrestamista: Option<i32>
+    pub fkPrestamista: Option<i64>
 }
 
 impl Prestamo {
     pub async fn getAllLoanOffers(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE fkPrestatario IS NULL").fetch_all(dbPool).await?;
+        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
         return Ok(data);
     }
 
     pub async fn getAllLoanRequests(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE fkPrestamista IS NULL").fetch_all(dbPool).await?;
+        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestamista\" IS NULL").fetch_all(dbPool).await?;
         return Ok(data);
     }
 
@@ -62,7 +65,7 @@ impl Prestamo {
     }
 
     pub async fn createLoanOffer(&mut self, offerer: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
-        match offerer.tipousuario {
+        match offerer.tipoUsuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
                 usuario::TipoUsuario::Administrador => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
@@ -73,7 +76,7 @@ impl Prestamo {
 
         self.fechaCreacion = chrono::Utc::now().naive_utc();
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestamista) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
@@ -87,7 +90,7 @@ impl Prestamo {
     }
 
     pub async fn createLoanRequest(&mut self, requester: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
-        match requester.tipousuario {
+        match requester.tipoUsuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
                 usuario::TipoUsuario::Administrador => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
@@ -98,7 +101,7 @@ impl Prestamo {
 
         self.fechaCreacion = chrono::Utc::now().naive_utc();
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, fechaCreacion, interes, plazoPago, intervaloPago, riesgo, fkPrestatario) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)

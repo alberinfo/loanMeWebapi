@@ -72,18 +72,18 @@ impl Mail {
             Mail::SignupConfirm(Usuario, ConfirmationId) => {
                 Message::builder()
                     .from("loanMe <no-reply@loanMe.com>".parse()?)
-                    .to(format!("{} <{}>", Usuario.nombrecompleto, Usuario.email).parse()?)
+                    .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Confirm your signup in order to use your account")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("{}", ConfirmationId))?
+                    .body(format!("http://localhost:4433/api/auth/confirmUser/{}", ConfirmationId))?
             },
             Mail::PwdRestore(Usuario, RestoreId) => {
                 Message::builder()
                     .from("loanMe <no-reply@loanMe.com>".parse()?)
-                    .to(format!("{} <{}>", Usuario.nombrecompleto, Usuario.email).parse()?)
+                    .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Restore pwd")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("{}", RestoreId))?
+                    .body(format!("http://localhost:4433/api/profile/restorePwd/{}", RestoreId))?
             },
             Mail::Test => {
                 return Err(MailError::Test);

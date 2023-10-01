@@ -823,6 +823,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "dotenvy",
+ "futures",
  "lettre",
  "redis",
  "serde",

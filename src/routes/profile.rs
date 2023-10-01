@@ -45,7 +45,7 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
 pub async fn changePwd(State(appState): State<appState::AppState>, Json(payload): Json<InputPerfilCrediticio>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
-    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreusuario, dbPool).await;
+    let usuario = Usuario::buscarUsuario(&payload.Usuario.nombreUsuario, dbPool).await;
     if let Err(r) = usuario {
         match r {
             UserError::MultithreadError(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while processing your request"))),
@@ -116,9 +116,9 @@ pub async fn changeCredit(State(mut appState): State<appState::AppState>, header
             }
         }
     }
-    let mut usuario = usuario.unwrap();
+    let usuario = usuario.unwrap();
 
-    let credit = PerfilCrediticio::get(payloadPerfil.fkusuario, dbPool).await;
+    let credit = PerfilCrediticio::get(usuario.id, dbPool).await;
     if let Err(err) = credit {
         match err {
             //no se encontro el usuario
@@ -128,10 +128,10 @@ pub async fn changeCredit(State(mut appState): State<appState::AppState>, header
     }
     let mut credit = credit.unwrap();
 
-    if payloadPerfil.historialcrediticio.is_some() { credit.historialcrediticio = payloadPerfil.historialcrediticio; }
-    if payloadPerfil.extractobancario.is_some() { credit.extractobancario = payloadPerfil.extractobancario; }
-    if payloadPerfil.comprobantedeingreso.is_some() { credit.comprobantedeingreso = payloadPerfil.comprobantedeingreso; }
-    if payloadPerfil.descripcionfinanciera.is_some() { credit.descripcionfinanciera = payloadPerfil.descripcionfinanciera; }
+    if payloadPerfil.historialCrediticio.is_some() { credit.historialCrediticio = payloadPerfil.historialCrediticio; }
+    if payloadPerfil.extractoBancario.is_some() { credit.extractoBancario = payloadPerfil.extractoBancario; }
+    if payloadPerfil.comprobanteDeIngreso.is_some() { credit.comprobanteDeIngreso = payloadPerfil.comprobanteDeIngreso; }
+    if payloadPerfil.descripcionFinanciera.is_some() { credit.descripcionFinanciera = payloadPerfil.descripcionFinanciera; }
 
     let res = credit.update(dbPool).await;
     return match res {
@@ -200,7 +200,7 @@ pub async fn restorePwd(State(mut appState): State<appState::AppState>, Path(res
     //We do this so that we can access the enum's values
     if let Mail::PwdRestore(mut Usuario, _restoreId) = mail {
         Usuario.contrasenna = newPwd;
-        let _ = Usuario.generatePwd();
+        let _ = Usuario.generatePwd().await;
         let res = Usuario.actualizarUsuario(dbPool).await;
 
         return match res {

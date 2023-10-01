@@ -7,19 +7,19 @@ pub struct PerfilCrediticio {
     #[serde(skip)]
     pub id: i64,
     #[serde(skip)]
-    pub fkusuario: i64,
+    pub fkUsuario: i64,
 
     pub dni: String,
 
-    pub historialcrediticio: Option<String>,
-    pub extractobancario: Option<String>,
-    pub comprobantedeingreso: Option<String>,
-    pub descripcionfinanciera: Option<String>,
+    pub historialCrediticio: Option<String>,
+    pub extractoBancario: Option<String>,
+    pub comprobanteDeIngreso: Option<String>,
+    pub descripcionFinanciera: Option<String>,
 }
 
 impl PerfilCrediticio {
     pub async fn get(fkUsuario: i64, dbPool: &sqlx::PgPool) -> sqlx::Result<PerfilCrediticio> {
-        let PerfilCrediticio: sqlx::Result<PerfilCrediticio> = sqlx::query_as::<_, PerfilCrediticio>("SELECT * FROM perfilcrediticio WHERE fkUsuario = $1")
+        let PerfilCrediticio: sqlx::Result<PerfilCrediticio> = sqlx::query_as::<_, PerfilCrediticio>("SELECT * FROM perfilCrediticio WHERE \"fkUsuario\" = $1")
             .bind(fkUsuario)
             .fetch_one(dbPool)
             .await;
@@ -28,24 +28,24 @@ impl PerfilCrediticio {
     }
 
     pub async fn save(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let res = sqlx::query("INSERT INTO perfilcrediticio(fkUsuario, dni, historialcrediticio, extractobancario, comprobantedeingreso, descripcionfinanciera) VALUES($1, $2, $3, $4, $5, $6)")
-            .bind(self.fkusuario)
+        let res = sqlx::query("INSERT INTO perfilCrediticio(\"fkUsuario\", dni, \"historialCrediticio\", \"extractoBancario\", \"comprobanteDeIngreso\", \"descripcionFinanciera\") VALUES($1, $2, $3, $4, $5, $6)")
+            .bind(self.fkUsuario)
             .bind(&self.dni)
-            .bind(&self.historialcrediticio)
-            .bind(&self.extractobancario)
-            .bind(&self.comprobantedeingreso)
-            .bind(&self.descripcionfinanciera)
+            .bind(&self.historialCrediticio)
+            .bind(&self.extractoBancario)
+            .bind(&self.comprobanteDeIngreso)
+            .bind(&self.descripcionFinanciera)
             .execute(dbPool)
             .await;
         return res;
     }
 
     pub async fn update(&self, dbPool: &sqlx::PgPool) -> sqlx::Result<sqlx::postgres::PgQueryResult> {
-        let res = sqlx::query("UPDATE perfilcrediticio SET historialcrediticio = $1, extractobancario = $2, comprobantedeingreso = $3, descripcionfinanciera = $4 WHERE id = $4")
-            .bind(&self.historialcrediticio)
-            .bind(&self.extractobancario)
-            .bind(&self.comprobantedeingreso)
-            .bind(&self.descripcionfinanciera)
+        let res = sqlx::query("UPDATE perfilCrediticio SET \"historialCrediticio\" = $1, \"extractoBancario\" = $2, \"comprobanteDeIngreso\" = $3, \"descripcionFinanciera\" = $4 WHERE id = $4")
+            .bind(&self.historialCrediticio)
+            .bind(&self.extractoBancario)
+            .bind(&self.comprobanteDeIngreso)
+            .bind(&self.descripcionFinanciera)
             .bind(self.id)
             .execute(dbPool)
             .await;

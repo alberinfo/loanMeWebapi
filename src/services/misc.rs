@@ -15,3 +15,14 @@ pub async fn generateRnd(bits: usize) -> Result<String, tokio::task::JoinError> 
 
     return Ok(rnd);
 }
+
+pub fn deserializeNaiveDateTime<'de, D>(
+    deserializer: D,
+) -> Result<chrono::NaiveDateTime, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let format = "%Y-%m-%d %H:%M:%S";
+    let s: &str = serde::Deserialize::deserialize(deserializer)?;
+    chrono::NaiveDateTime::parse_from_str(s, format).map_err(serde::de::Error::custom)
+}

@@ -3,6 +3,7 @@
 
 use axum::http::header;
 use axum::{response::IntoResponse, Json, extract::State, http::StatusCode};
+use futures::StreamExt;
 
 use crate::models::InputTypes::InputPrestamo;
 use crate::models::Prestamo::*;
@@ -14,33 +15,38 @@ pub async fn getLoanOffers(State(appState): State<appState::AppState>) -> impl I
     let dbPool = appState.dbState.getConnection().unwrap();
     let result: Result<Vec<Prestamo>, LoanError> = Prestamo::getAllLoanOffers(dbPool).await;
 
-    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None, habilitado: false };
-    //let loaners = vec![defaultUser; result.]
-
     //We know getAllLoanOffers only returns Ok or Err(sqlx::Error)
     if let Err(err) = result {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 
-    let result = result.unwrap();
-    return Ok(Json(result));
+    let LoanOffers: Vec<Prestamo> = result.unwrap();
+    let Futures: futures::stream::FuturesOrdered<_> = LoanOffers.into_iter().map(|LoanOffer: Prestamo| async move {
+        let fkPrestamista = LoanOffer.fkPrestamista.unwrap();
+        (LoanOffer, Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap())
+    }).collect();
+    let LoanOffersWithLoaners: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+
+    return Ok(Json(LoanOffersWithLoaners));
 }
 
 pub async fn getLoanRequests(State(appState): State<appState::AppState>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let result: Result<Vec<Prestamo>, LoanError> = Prestamo::getAllLoanRequests(dbPool).await;
 
-    let defaultUser = Usuario { id: 0, email: String::from(""), nombrecompleto: String::from(""), nombreusuario: String::from(""), contrasenna: String::from(""), idwallet: None, tipousuario: None, habilitado: false };
-    //let loaners = vec![defaultUser; result.]
-
-
     //We know getAllLoanRequests only returns Ok or Err(sqlx::Error)
     if let Err(err) = result {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
     }
 
-    let result = result.unwrap();
-    return Ok(Json(result));
+    let LoanRequests: Vec<Prestamo> = result.unwrap();
+
+    let Futures: futures::stream::FuturesOrdered<_> = LoanRequests.into_iter().map(|LoanOffer: Prestamo| async move {
+        let fkPrestatario = LoanOffer.fkPrestatario.unwrap();
+        (LoanOffer, Usuario::buscarUsuarioById(fkPrestatario, dbPool).await.unwrap())
+    }).collect();
+    let LoanRequestsWithLoanees: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+    return Ok(Json(LoanRequestsWithLoanees));
 }
 
 pub async fn getLoanById(State(appState): State<appState::AppState>, Json(LoanId): Json<i64>) -> impl IntoResponse {

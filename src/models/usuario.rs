@@ -32,19 +32,22 @@ pub struct Usuario {
     #[serde(skip)]
     pub id: i64,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub email: String,
 
     #[serde(default)]
-    pub nombrecompleto: String,
+    pub nombreCompleto: String,
 
-    pub nombreusuario: String,
+    pub nombreUsuario: String,
 
+    #[serde(skip_serializing)]
     pub contrasenna: String,
 
-    pub idwallet: Option<String>,
+    #[serde(skip_serializing)]
+    pub idWallet: Option<String>,
 
-    pub tipousuario: Option<TipoUsuario>,
+    #[serde(skip_serializing)]
+    pub tipoUsuario: Option<TipoUsuario>,
 
     #[serde(skip)]
     pub habilitado: bool
@@ -72,16 +75,16 @@ impl Usuario {
         return Ok(res);
     }
 
-    pub async fn buscarUsuario(nombreusuario: &String, dbPool: &sqlx::PgPool) -> Result<Usuario, UserError> {
-        let usuario: Usuario = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE nombreusuario = $1")
-            .bind(nombreusuario)
+    pub async fn buscarUsuario(nombreUsuario: &String, dbPool: &sqlx::PgPool) -> Result<Usuario, UserError> {
+        let usuario: Usuario = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE \"nombreUsuario\" = $1")
+            .bind(nombreUsuario)
             .fetch_one(dbPool)
             .await?;
     
         return Ok(usuario);
     }
 
-    pub async fn buscarUsuarioById(id: &String, dbPool: &sqlx::PgPool) -> Result<Usuario, UserError> {
+    pub async fn buscarUsuarioById(id: i64, dbPool: &sqlx::PgPool) -> Result<Usuario, UserError> {
         let usuario: Usuario = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE id = $1")
             .bind(id)
             .fetch_one(dbPool)
@@ -90,9 +93,9 @@ impl Usuario {
         return Ok(usuario);
     }
     
-    pub async fn getUserId(nombreusuario: &String, dbPool: &sqlx::PgPool) -> Result<i64, UserError> {
-        let row = sqlx::query("SELECT ID FROM usuario WHERE nombreusuario = $1")
-            .bind(nombreusuario)
+    pub async fn getUserId(nombreUsuario: &String, dbPool: &sqlx::PgPool) -> Result<i64, UserError> {
+        let row = sqlx::query("SELECT ID FROM usuario WHERE \"nombreUsuario\" = $1")
+            .bind(nombreUsuario)
             .fetch_one(dbPool)
             .await?;
 
@@ -101,13 +104,13 @@ impl Usuario {
     }
 
     pub async fn crearUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let res = sqlx::query("INSERT INTO usuario(email, nombrecompleto, nombreusuario, contrasenna, idwallet, tipousuario, habilitado) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let res = sqlx::query("INSERT INTO Usuario(email, \"nombreCompleto\", \"nombreUsuario\", contrasenna, \"idWallet\", \"tipoUsuario\", habilitado) VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.email)
-            .bind(&self.nombrecompleto)
-            .bind(&self.nombreusuario)
+            .bind(&self.nombreCompleto)
+            .bind(&self.nombreUsuario)
             .bind(&self.contrasenna)
-            .bind(&self.idwallet)
-            .bind(self.tipousuario.as_ref().unwrap() as &TipoUsuario)
+            .bind(&self.idWallet)
+            .bind(self.tipoUsuario.as_ref().unwrap() as &TipoUsuario)
             .bind(false)
             .execute(dbPool)
             .await?;
@@ -115,13 +118,13 @@ impl Usuario {
     }
 
     pub async fn actualizarUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let usrId = Usuario::getUserId(&self.nombreusuario, dbPool).await?;
+        let usrId = Usuario::getUserId(&self.nombreUsuario, dbPool).await?;
 
-        let res = sqlx::query("UPDATE usuario SET email = $1, nombreUsuario = $2, contrasenna = $3, idWallet = $4 WHERE ID = $5")
+        let res = sqlx::query("UPDATE usuario SET email = $1, \"nombreUsuario\" = $2, contrasenna = $3, \"idWallet\" = $4 WHERE ID = $5")
             .bind(&self.email)
-            .bind(&self.nombreusuario)
+            .bind(&self.nombreUsuario)
             .bind(&self.contrasenna)
-            .bind(&self.idwallet)
+            .bind(&self.idWallet)
             .bind(usrId)
             .execute(dbPool)
             .await?;
@@ -129,24 +132,24 @@ impl Usuario {
     }
 
     pub async fn eliminarUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let res = sqlx::query("DELETE FROM usuario WHERE nombreusuario = $1")
-            .bind(&self.nombreusuario)
+        let res = sqlx::query("DELETE FROM usuario WHERE \"nombreUsuario\" = $1")
+            .bind(&self.nombreUsuario)
             .execute(dbPool)
             .await?;
         return Ok(res);
     }
 
     pub async fn habilitarUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let res = sqlx::query("UPDATE usuario SET habilitado = true WHERE nombreusuario = $1")
-            .bind(&self.nombreusuario)
+        let res = sqlx::query("UPDATE usuario SET habilitado = true WHERE \"nombreUsuario\" = $1")
+            .bind(&self.nombreUsuario)
             .execute(dbPool)
             .await?;
         return Ok(res);
     }
 
     pub async fn deshabilitarUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let res = sqlx::query("UPDATE usuario SET habilitado = false WHERE nombreusuario = $1")
-            .bind(&self.nombreusuario)
+        let res = sqlx::query("UPDATE usuario SET habilitado = false WHERE \"nombreUsuario\" = $1")
+            .bind(&self.nombreUsuario)
             .execute(dbPool)
             .await?;
         return Ok(res);
