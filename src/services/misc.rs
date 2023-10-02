@@ -26,3 +26,15 @@ where
     let s: &str = serde::Deserialize::deserialize(deserializer)?;
     chrono::NaiveDateTime::parse_from_str(s, format).map_err(serde::de::Error::custom)
 }
+
+pub fn serializeNaiveDateTime<S>(
+    date: &chrono::NaiveDateTime,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let format = "%Y-%m-%d %H:%M:%S";
+    let s = format!("{}", date.format(format));
+    serializer.serialize_str(&s)
+}

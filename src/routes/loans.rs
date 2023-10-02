@@ -23,9 +23,18 @@ pub async fn getLoanOffers(State(appState): State<appState::AppState>) -> impl I
     let LoanOffers: Vec<Prestamo> = result.unwrap();
     let Futures: futures::stream::FuturesOrdered<_> = LoanOffers.into_iter().map(|LoanOffer: Prestamo| async move {
         let fkPrestamista = LoanOffer.fkPrestamista.unwrap();
-        (LoanOffer, Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap())
+
+        let loanItem = LoanItem {
+            loan: LoanOffer,
+            user: Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap()
+        };
+
+        loanItem
+
+        //(LoanOffer, Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap())
     }).collect();
-    let LoanOffersWithLoaners: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+    //let LoanOffersWithLoaners: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+    let LoanOffersWithLoaners: Vec<LoanItem> = Futures.collect().await;
 
     return Ok(Json(LoanOffersWithLoaners));
 }
@@ -41,11 +50,21 @@ pub async fn getLoanRequests(State(appState): State<appState::AppState>) -> impl
 
     let LoanRequests: Vec<Prestamo> = result.unwrap();
 
-    let Futures: futures::stream::FuturesOrdered<_> = LoanRequests.into_iter().map(|LoanOffer: Prestamo| async move {
-        let fkPrestatario = LoanOffer.fkPrestatario.unwrap();
-        (LoanOffer, Usuario::buscarUsuarioById(fkPrestatario, dbPool).await.unwrap())
+    let Futures: futures::stream::FuturesOrdered<_> = LoanRequests.into_iter().map(|LoanRequest: Prestamo| async move {
+        let fkPrestatario = LoanRequest.fkPrestatario.unwrap();
+        
+        let loanItem = LoanItem {
+            loan: LoanRequest,
+            user: Usuario::buscarUsuarioById(fkPrestatario, dbPool).await.unwrap()
+        };
+
+        loanItem
+        
+        //(LoanOffer, Usuario::buscarUsuarioById(fkPrestatario, dbPool).await.unwrap())
     }).collect();
-    let LoanRequestsWithLoanees: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+    //let LoanRequestsWithLoanees: Vec<(Prestamo, Usuario)> = Futures.collect().await;
+    let LoanRequestsWithLoanees: Vec<LoanItem> = Futures.collect().await;
+    
     return Ok(Json(LoanRequestsWithLoanees));
 }
 
@@ -87,6 +106,7 @@ pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, hea
         Ok(()) => Ok("Done"),
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::InvalidDate => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
@@ -118,6 +138,7 @@ pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, h
         Ok(()) => Ok("Done"),
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::InvalidDate => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
         }

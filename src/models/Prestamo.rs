@@ -3,12 +3,15 @@
 
 use bigdecimal::BigDecimal;
 use super::usuario;
-use crate::services::misc::deserializeNaiveDateTime;
+use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 #[derive(thiserror::Error, Debug)]
 pub enum LoanError {
     #[error("There was an error while executing a database query")]
     DbError(#[from] sqlx::Error),
+
+    #[error("The provided date is invalid")]
+    InvalidDate,
 
     #[error("User provided has an invalid type {found:?}")]
     InvalidUserType {
@@ -28,12 +31,12 @@ pub struct Prestamo {
     pub id: i64,
     pub monto: BigDecimal,
 
-    #[serde(skip_deserializing)]
+    #[serde(skip_deserializing, serialize_with = "serializeNaiveDateTime")]
     pub fechaCreacion: chrono::NaiveDateTime,
     
     pub interes: f64,
 
-    #[serde(deserialize_with = "deserializeNaiveDateTime")]
+    #[serde(deserialize_with = "deserializeNaiveDateTime", serialize_with = "serializeNaiveDateTime")]
     pub plazoPago: chrono::NaiveDateTime,
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
@@ -43,6 +46,12 @@ pub struct Prestamo {
 
     #[serde(skip_serializing)]
     pub fkPrestamista: Option<i64>
+}
+
+#[derive(serde::Serialize, Debug)]
+pub struct LoanItem {
+    pub loan: Prestamo,
+    pub user: super::usuario::Usuario
 }
 
 impl Prestamo {
@@ -76,6 +85,10 @@ impl Prestamo {
 
         self.fechaCreacion = chrono::Utc::now().naive_utc();
 
+        if self.fechaCreacion.timestamp() >= self.plazoPago.timestamp() { //si el plazo de pago esta puesto como previo al momento de creacion del prestamo
+            return Err(LoanError::InvalidDate);
+        }
+
         let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
@@ -100,6 +113,10 @@ impl Prestamo {
         }
 
         self.fechaCreacion = chrono::Utc::now().naive_utc();
+
+        if self.fechaCreacion.timestamp() >= self.plazoPago.timestamp() { //si el plazo de pago esta puesto como previo al momento de creacion del prestamo
+            return Err(LoanError::InvalidDate);
+        }
 
         let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7)")
             .bind(&self.monto)
