@@ -42,7 +42,6 @@ impl Mail {
             },
             "restoreId" => {
                 let userJson = redisConn.get_del::<String, String>(format!("{}{}", "restoreId", id)).await?;
-                let user: Usuario = serde_json::from_str(&userJson).unwrap();
                 let mut user: Usuario = serde_json::from_str(&userJson).unwrap();
                 user.contrasenna.pop(); //remover el "*"
                 return Ok(Mail::PwdRestore(user, id.to_string()));
