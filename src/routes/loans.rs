@@ -78,7 +78,15 @@ pub async fn getLoanById(State(appState): State<appState::AppState>, Json(LoanId
     }
 
     let result = result.unwrap();
-    return Ok(Json(result));
+
+    let fkUsuario = result.fkPrestamista.unwrap_or(result.fkPrestatario.unwrap());
+
+    let LoanWithUser = LoanItem {
+        loan: result,
+        user: Usuario::buscarUsuarioById(fkUsuario, dbPool).await.unwrap()
+    };
+
+    return Ok(Json(LoanWithUser));
 }
 
 pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(payload): Json<InputPrestamo>) -> impl IntoResponse {
