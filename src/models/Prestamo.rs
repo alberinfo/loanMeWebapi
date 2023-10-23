@@ -2,7 +2,7 @@
 #![allow(clippy::needless_return)]
 
 use bigdecimal::BigDecimal;
-use super::usuario;
+use super::{usuario, PrestamoTxn::PrestamoTxn};
 use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 #[derive(thiserror::Error, Debug)]
@@ -25,7 +25,6 @@ pub enum LoanError {
 }
 
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Default, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct Prestamo {
     #[serde(skip_deserializing)]
     pub id: i64,
@@ -40,6 +39,8 @@ pub struct Prestamo {
     pub plazoPago: chrono::NaiveDateTime,
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
+
+    pub txns: Vec<PrestamoTxn>,
 
     #[serde(skip_serializing)]
     pub fkPrestatario: Option<i64>,
@@ -56,7 +57,7 @@ pub struct LoanItem {
 
 impl Prestamo {
     pub async fn getAllLoanOffers(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
+        let data = sqlx::query_as::<_, Prestamo>("SELECT *, ARRAY(NULL) AS txns FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
         return Ok(data);
     }
 
@@ -66,7 +67,7 @@ impl Prestamo {
     }
 
     pub async fn getLoanById(id: i64, dbPool: &sqlx::PgPool) -> Result<Prestamo, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE ID = $1")
+        let data = sqlx::query_as::<_, Prestamo>("SELECT Prestamo.*, (SELECT * FROM PrestamoTxn WHERE \"fkPrestamo\" = $1) AS txns FROM Prestamo WHERE ID = $1")
             .bind(id)
             .fetch_one(dbPool)
             .await?;
