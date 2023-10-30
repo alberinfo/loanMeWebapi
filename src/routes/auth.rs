@@ -76,7 +76,7 @@ pub async fn register(State(mut appState): State<appState::AppState>, Json(paylo
 
         //Err(r) => return Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string()))
         Err(r) => match r {
-            UserError::MultithreadError(err) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while creating the user"))),
+            UserError::MultithreadError(_err) => return Err((StatusCode::INTERNAL_SERVER_ERROR, String::from("There was an error while creating the user"))),
             UserError::DbError(err) => match err {
                 sqlx::Error::Database(DbError) => return Err((StatusCode::BAD_REQUEST, DbError.message().to_string())), //we assume that the error is a UNIQUE related error, thus user-side error.
                 _ => return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))

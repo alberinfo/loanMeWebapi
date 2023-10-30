@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use super::PrestamoTxn::PrestamoTxn;
 use super::usuario::Usuario;
 use super::PerfilCrediticio::PerfilCrediticio;
 use super::Prestamo::Prestamo;
@@ -19,4 +20,9 @@ pub struct InputPrestamo {
 
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct InputTxn {
+    pub txn: PrestamoTxn
 }

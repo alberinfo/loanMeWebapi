@@ -47,7 +47,6 @@ pub struct Usuario {
     #[serde(skip_serializing_if = "shouldSerializePwd")]
     pub contrasenna: String,
 
-    #[serde(skip_serializing)]
     pub idWallet: Option<String>,
 
     pub tipoUsuario: Option<TipoUsuario>,

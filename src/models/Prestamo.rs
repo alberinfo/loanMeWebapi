@@ -40,8 +40,6 @@ pub struct Prestamo {
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
 
-    pub txns: Vec<PrestamoTxn>,
-
     #[serde(skip_serializing)]
     pub fkPrestatario: Option<i64>,
 
@@ -52,6 +50,7 @@ pub struct Prestamo {
 #[derive(serde::Serialize, Debug)]
 pub struct LoanItem {
     pub loan: Prestamo,
+    pub txns: Vec<PrestamoTxn>,
     pub user: super::usuario::Usuario
 }
 
