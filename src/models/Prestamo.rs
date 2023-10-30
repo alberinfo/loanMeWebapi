@@ -13,6 +13,9 @@ pub enum LoanError {
     #[error("The provided date is invalid")]
     InvalidDate,
 
+    #[error("User is not valid for this operation")]
+    InvalidUser,
+
     #[error("User provided has an invalid type {found:?}")]
     InvalidUserType {
         found: Option<usuario::TipoUsuario>
@@ -56,7 +59,7 @@ pub struct LoanItem {
 
 impl Prestamo {
     pub async fn getAllLoanOffers(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT *, ARRAY(NULL) AS txns FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
+        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
         return Ok(data);
     }
 
@@ -128,6 +131,37 @@ impl Prestamo {
             .bind(requester.id)
             .execute(dbPool)
             .await?;
+        return Ok(());
+    }
+
+    /*pub async fn proposeCompleteLoan(LoanId: i64, user: usuario::Usuario, redisConn: &mut redis::aio::ConnectionManager, mailingPool: &lettre::AsyncSmtpTransport<lettre::Tokio1Executor>) -> Result<(), redis::RedisError> {
+        //redisConn.set::<String, String, String>(format!("{}{}", "loanCompletionProposal", RestoreId), serde_json::to_string(Usuario).unwrap(), DEFAULT_PWDRESTORE_EXPIRATION).await?;
+    }*/
+
+    pub async fn completeLoan(LoanId: i64, user: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+        let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
+
+        let res = match user.tipoUsuario {
+            None => return Err(LoanError::InvalidUserType { found: None }),
+            Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
+                (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
+                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestamista, found: usuario::TipoUsuario::Prestamista }),
+                (usuario::TipoUsuario::Prestamista, None, _) => {
+                    if loan.fkPrestatario.unwrap() == user.id {
+                        return Err(LoanError::InvalidUser)
+                    }
+                    sqlx::query("UPDATE Prestamo SET fkPrestamista = $1 WHERE id = $2").bind(user.id).bind(LoanId).execute(dbPool).await?
+                },
+                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestatario, found: usuario::TipoUsuario::Prestatario }),
+                (usuario::TipoUsuario::Prestatario, _, None) => {
+                    if loan.fkPrestamista.unwrap() == user.id {
+                        return Err(LoanError::InvalidUser)
+                    }
+                    sqlx::query("UPDATE Prestamo SET fkPrestatario = $1 WHERE id = $2").bind(user.id).bind(LoanId).execute(dbPool).await?
+                }
+            }
+        };
+
         return Ok(());
     }
 }
