@@ -57,6 +57,12 @@ pub struct LoanItem {
     pub user: super::usuario::Usuario
 }
 
+#[derive(sqlx::FromRow, serde::Serialize, Default, Debug)]
+pub struct PrestamoPropuesta {
+    pub fkPrestamo: i64,
+    pub fkUsuario: i64
+}
+
 impl Prestamo {
     pub async fn getAllLoanOffers(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
         let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestatario\" IS NULL").fetch_all(dbPool).await?;
@@ -65,6 +71,15 @@ impl Prestamo {
 
     pub async fn getAllLoanRequests(dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
         let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestamista\" IS NULL").fetch_all(dbPool).await?;
+        return Ok(data);
+    }
+
+    pub async fn getAllLoansFromUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<Prestamo>, LoanError> {
+        let data = sqlx::query_as::<_, Prestamo>("SELECT * FROM Prestamo WHERE \"fkPrestamista\" = $1 OR \"fkPrestatario\" = $1 ")
+            .bind(UserId)
+            .fetch_all(dbPool)
+            .await?;
+
         return Ok(data);
     }
 
@@ -134,33 +149,60 @@ impl Prestamo {
         return Ok(());
     }
 
-    /*pub async fn proposeCompleteLoan(LoanId: i64, user: usuario::Usuario, redisConn: &mut redis::aio::ConnectionManager, mailingPool: &lettre::AsyncSmtpTransport<lettre::Tokio1Executor>) -> Result<(), redis::RedisError> {
-        //redisConn.set::<String, String, String>(format!("{}{}", "loanCompletionProposal", RestoreId), serde_json::to_string(Usuario).unwrap(), DEFAULT_PWDRESTORE_EXPIRATION).await?;
-    }*/
-
-    pub async fn completeLoan(LoanId: i64, user: usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn proposeCompleteLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
-        let res = match user.tipoUsuario {
+        let res = match &user.tipoUsuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
-                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestamista, found: usuario::TipoUsuario::Prestamista }),
-                (usuario::TipoUsuario::Prestamista, None, _) => {
+                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestatario, found: usuario::TipoUsuario::Prestamista }),
+                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestamista, found: usuario::TipoUsuario::Prestatario }),
+                (usuario::TipoUsuario::Prestamista, None, _) | (usuario::TipoUsuario::Prestatario, _, None) => {
                     if loan.fkPrestatario.unwrap() == user.id {
                         return Err(LoanError::InvalidUser)
                     }
-                    sqlx::query("UPDATE Prestamo SET fkPrestamista = $1 WHERE id = $2").bind(user.id).bind(LoanId).execute(dbPool).await?
+                    sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?
                 },
-                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestatario, found: usuario::TipoUsuario::Prestatario }),
-                (usuario::TipoUsuario::Prestatario, _, None) => {
-                    if loan.fkPrestamista.unwrap() == user.id {
-                        return Err(LoanError::InvalidUser)
-                    }
-                    sqlx::query("UPDATE Prestamo SET fkPrestatario = $1 WHERE id = $2").bind(user.id).bind(LoanId).execute(dbPool).await?
-                }
+
             }
         };
+
+        return Ok(());
+    }
+
+    //////// HACEEEEEEEEER
+    /*pub async fn getAllLoanProposalsForUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<PrestamoPropuesta>, LoanError> {
+        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fk\" = $1 OR \"fkPrestatario\" = $1 ")
+            .bind(UserId)
+            .fetch_all(dbPool)
+            .await?;
+
+        return Ok(data);
+    }*/
+
+    pub async fn completeLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+        let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
+
+        let proposal = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" = $1 AND \"fkUsuario\" = $2")
+            .bind(LoanId)
+            .bind(user.id)
+            .fetch_optional(dbPool)
+            .await?;
+
+        if let None = proposal {
+            return Err(LoanError::InvalidUser);
+        }
+
+        let proposal = proposal.unwrap();
+        
+        let _ = match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista, loan.fkPrestatario) {
+            (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1 WHERE ID = $2").bind(user.id).bind(LoanId).execute(dbPool).await?,
+            (usuario::TipoUsuario::Prestatario, Some(_), None) => sqlx::query("UPDATE Prestamo SET \"fkPrestatario\" = $1 WHERE ID = $2").bind(user.id).bind(LoanId).execute(dbPool).await?,
+            (_, _, _) => return Err(LoanError::InvalidUser)
+        };
+
+        let _ = sqlx::query("DELETE FROM PrestamoPropuestas WHERE \"fkPrestamo\" = $1 ").bind(LoanId).execute(dbPool).await?;
 
         return Ok(());
     }

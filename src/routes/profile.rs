@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use axum::{http::{StatusCode, header}, response::IntoResponse, Json, extract::{State, Path}};
 
-use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}}};
+use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}, Prestamo::{Prestamo, LoanError}}};
 
 //Reads current user info
 pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
@@ -33,11 +33,25 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
 
     let perfilCrediticio = res.unwrap();
 
-    let response = InputPerfilCrediticio {
-        Usuario: user,
+    let mut response = InputPerfilCrediticio {
+        Usuario: user.clone(),
         perfil: Some(perfilCrediticio),
         extra: HashMap::new()
     };
+
+    let allLoansFromUser = Prestamo::getAllLoansFromUser(user.id, dbPool).await;
+
+    if let Err(r) = allLoansFromUser {
+        return match r {
+            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+        }
+    }
+
+    response.extra.insert(String::from("loans"), serde_json::to_value(allLoansFromUser.unwrap()).unwrap());
+    //response.extra["loanProposals"] = Prestamo
 
     return Ok(Json(response));
 }

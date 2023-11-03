@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/getLoanById", get(loans::getLoanById))
         .route("/createLoanOffer", post(loans::createLoanOffer))
         .route("/createLoanRequest", post(loans::createLoanRequest))
+        .route("/proposeCompleteLoan", post(loans::proposeCompleteLoan))
         .route("/completeLoan", patch(loans::completeLoan))
         .route("/addTxn", post(loans::addTxn));
 

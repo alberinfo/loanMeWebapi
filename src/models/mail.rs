@@ -29,7 +29,8 @@ pub enum MailError {
 pub enum Mail {
     SignupConfirm(Usuario, String), //User, CreditHistory ConfirmationId
     PwdRestore(Usuario, String), //User, RestoreId
-    //LoanCompletion(i64, Usuario, String), //LoanId to complete User that proposes completion and completion id.
+    LoanProposal(Usuario, Usuario, i64), //User that created the loan, loan proposer, loan id.
+    LoanProposalAccepted(Usuario, i64), //User that proposed completion, loan id
     Test
 }
 
@@ -49,9 +50,6 @@ impl Mail {
                 user.contrasenna.pop(); //remover el "*"
                 return Ok(Mail::PwdRestore(user, id.to_string()));
             },
-            /*"loanCompletion" => {
-                let 
-            }*/
             _ => {
                 return Ok(Mail::Test);
             }
@@ -71,10 +69,7 @@ impl Mail {
                 Usuario.contrasenna.push('*');
                 redisConn.set_ex::<String, String, String>(format!("{}{}", "restoreId", RestoreId), serde_json::to_string(Usuario).unwrap(), DEFAULT_PWDRESTORE_EXPIRATION).await?;
             },
-            /*Mail::LoanCompletion(LoanId, Usuario, CompletionId) => {
-                redisConn.set::<String, String, String>(format!("{}{}/{}", "loanCompletion", CompletionId, LoanId), serde_json::to_string(Usuario).unwrap());
-            }*/
-            Mail::Test => {}
+            Mail::Test | _ => {},
         }
 
         return Ok(());
@@ -98,11 +93,22 @@ impl Mail {
                     .header(ContentType::TEXT_PLAIN)
                     .body(format!("http://localhost:4433/restorePwd/?token={}", RestoreId))?
             },
-            /*Mail::LoanCompletion(LoanId, Usuario, CompletionId) => {
+            Mail::LoanProposal(LoanCreator, LoanCompleter, LoanId) => {
                 Message::builder()
                     .from("loanMe <no-reply@loanMe.com>".parse()?)
-                    .to(format!("{} <{}>", ))
-            }*/
+                    .to(format!("{} <{}>", LoanCreator.nombreCompleto, LoanCreator.email).parse()?)
+                    .subject("Loan completion proposal")
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(format!("User {} wants to be your other half! See your loan here http://localhost:4433/getLoanById/{}", LoanCompleter.nombreUsuario, LoanId))?
+            },
+            Mail::LoanProposalAccepted(LoanCompleter, LoanId) => {
+                Message::builder()
+                    .from("loanMe <no-reply@loanMe.com>".parse()?)
+                    .to(format!("{} <{}>", LoanCompleter.nombreCompleto, LoanCompleter.email).parse()?)
+                    .subject("Loan proposal accepted")
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(format!("Your loan completion proposal has been accepted! See the loan here http://localhost:4433/getLoanById/{}", LoanId))?
+            }
             Mail::Test => {
                 return Err(MailError::Test);
             }
