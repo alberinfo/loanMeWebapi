@@ -208,25 +208,19 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 }
 
 
-pub async fn completeLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(LoanId): Json<i64>) -> impl IntoResponse {
+pub async fn completeLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConn = appState.redisState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
 
-    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
-    let res = Session::getSessionUserById(&sessionId, redisConn).await;
-    if let Err(err) = res {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
-    }
-
-    let res = Usuario::buscarUsuario(&res.unwrap(), dbPool).await;
+    let res = Usuario::buscarUsuarioById(completionProposal.fkUsuario, dbPool).await;
     if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
     }
 
     let user = res.unwrap();
     
-    let res = Prestamo::completeLoan(LoanId, &user, dbPool).await;
+    let res = Prestamo::completeLoan(completionProposal.fkPrestamo, &user, dbPool).await;
 
     if let Err(r) = res {
         return match r {
@@ -237,21 +231,7 @@ pub async fn completeLoan(State(mut appState): State<appState::AppState>, header
         }
     }
 
-    let loan = Prestamo::getLoanById(LoanId, dbPool).await;
-
-    if let Err(r) = loan {
-        return match r {
-            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
-            LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
-        }
-    }
-
-    let loan = loan.unwrap();
-    let loanCompleterId = if loan.fkPrestamista.unwrap() == user.id {loan.fkPrestatario.unwrap()} else {loan.fkPrestamista.unwrap()};
-
-    let res = Usuario::buscarUsuarioById(loanCompleterId, dbPool).await; //If fkPrestamista is None, then fkPrestatario surely is Some, and viceversa
+    let res = Usuario::buscarUsuarioById(completionProposal.fkUsuario, dbPool).await; //If fkPrestamista is None, then fkPrestatario surely is Some, and viceversa
 
     if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
@@ -260,7 +240,7 @@ pub async fn completeLoan(State(mut appState): State<appState::AppState>, header
     let loanCompleter = res.unwrap();
 
 
-    let mail = mail::Mail::LoanProposalAccepted(loanCompleter, LoanId);
+    let mail = mail::Mail::LoanProposalAccepted(loanCompleter, completionProposal.fkPrestamo);
     let sendRes = mail.send(mailingPool).await;
 
     return match sendRes {

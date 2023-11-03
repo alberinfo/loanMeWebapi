@@ -14,7 +14,7 @@ pub enum AcceptedBlockchains {
 
 #[derive(sqlx::FromRow, sqlx::Type, serde::Serialize, serde::Deserialize, Debug)]
 pub struct PrestamoTxn {
-    #[serde(skip_serializing, rename="loanId")]
+    #[serde(skip_serializing, rename="LoanId")]
     pub fkPrestamo: i64,
 
     pub blockchain: AcceptedBlockchains,

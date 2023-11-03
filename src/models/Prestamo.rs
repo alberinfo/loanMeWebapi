@@ -22,8 +22,8 @@ pub enum LoanError {
     },
     #[error("User is unauthorized for this operation (expected: ?, found: ?)")]
     UserUnauthorized {
-        expected: usuario::TipoUsuario,
-        found: usuario::TipoUsuario
+        expected: Option<usuario::TipoUsuario>,
+        found: Option<usuario::TipoUsuario>
     }
 }
 
@@ -57,9 +57,13 @@ pub struct LoanItem {
     pub user: super::usuario::Usuario
 }
 
-#[derive(sqlx::FromRow, serde::Serialize, Default, Debug)]
+#[derive(sqlx::FromRow, serde::Deserialize, serde::Serialize, Default, Debug)]
+#[serde(rename = "LoanProposal")]
 pub struct PrestamoPropuesta {
+    #[serde(rename = "LoanId")]
     pub fkPrestamo: i64,
+
+    #[serde(rename = "UserId")]
     pub fkUsuario: i64
 }
 
@@ -96,7 +100,7 @@ impl Prestamo {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
                 usuario::TipoUsuario::Administrador => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
-                usuario::TipoUsuario::Prestatario => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestamista, found: usuario::TipoUsuario::Prestatario }),
+                usuario::TipoUsuario::Prestatario => return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestamista), found: Some(usuario::TipoUsuario::Prestatario) }),
                 usuario::TipoUsuario::Prestamista => ()
             }
         }
@@ -125,7 +129,7 @@ impl Prestamo {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match x {
                 usuario::TipoUsuario::Administrador => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
-                usuario::TipoUsuario::Prestamista => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestatario, found: usuario::TipoUsuario::Prestamista }),
+                usuario::TipoUsuario::Prestamista => return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestatario), found: Some(usuario::TipoUsuario::Prestamista) }),
                 usuario::TipoUsuario::Prestatario => ()
             }
         }
@@ -156,8 +160,8 @@ impl Prestamo {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
-                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestatario, found: usuario::TipoUsuario::Prestamista }),
-                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: usuario::TipoUsuario::Prestamista, found: usuario::TipoUsuario::Prestatario }),
+                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestamista) }),
+                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestatario) }),
                 (usuario::TipoUsuario::Prestamista, None, _) | (usuario::TipoUsuario::Prestatario, _, None) => {
                     if loan.fkPrestatario.unwrap() == user.id {
                         return Err(LoanError::InvalidUser)
@@ -191,7 +195,7 @@ impl Prestamo {
             .await?;
 
         if let None = proposal {
-            return Err(LoanError::InvalidUser);
+            return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestamista), found: None });
         }
 
         let proposal = proposal.unwrap();
