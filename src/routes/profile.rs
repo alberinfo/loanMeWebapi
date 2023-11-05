@@ -51,7 +51,19 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
     }
 
     response.extra.insert(String::from("loans"), serde_json::to_value(allLoansFromUser.unwrap()).unwrap());
-    //response.extra["loanProposals"] = Prestamo
+
+    let allLoanProposals = Prestamo::getAllLoanProposalsForUser(user.id, dbPool).await;
+
+    if let Err(r) = allLoanProposals {
+        return match r {
+            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+        }
+    }
+
+    response.extra.insert(String::from("loanProposals"), serde_json::to_value(allLoanProposals.unwrap()).unwrap());
 
     return Ok(Json(response));
 }

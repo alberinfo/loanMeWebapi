@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
-use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next};
+use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next, TypedHeader};
 
 use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, mail::{self, Mail}}};
 use crate::models::{usuario::Usuario, usuario::UserError, session::Session};
@@ -11,7 +11,7 @@ pub async fn validationLayer(State(mut appState): State<appState::AppState>, req
 
     let current_path = &req.uri().path().to_string();
 
-    let skip_paths = vec!["/auth/register", "/auth/login", "/auth/confirmUser", "/profile/requestRestorePwd", "/profile/restorePwd"]; //Añadir caminos a medida que sea necesario.
+    let skip_paths = vec!["/auth/register", "/auth/login", "/auth/confirmUser", "/profile/requestRestorePwd", "/profile/restorePwd", "/payment/getAcceptedCurrencies"]; //Añadir caminos a medida que sea necesario.
     for skip_path in skip_paths {
         if current_path.starts_with(skip_path) {
             return next.run(req).await;
@@ -196,7 +196,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     //If the user already has an active session, close it.
     if userHasActiveSession {
         oldSession.id = Session::getSessionIdByUsername(&usuario.nombreUsuario, redisConnection).await.unwrap();
-        let res = oldSession.deleteSession(redisConnection).await;
+        let res = Session::deleteSession(&oldSession.id, redisConnection).await;
         if let Err(err) = res {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
         }
@@ -213,14 +213,9 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 pub async fn logout(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
     let redisConnection = appState.redisState.getConnection().unwrap();
     
-    let session = Session {
-        username: String::from(""),
-        id: headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(), //in auth.rs we already confirmed header is Some(value)
-        creationDate: None
-    };
+    let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
 
-    //We dont need to check if the header exists, we already did that in auth.rs
-    let res = session.deleteSession(redisConnection).await;
+    let res = Session::deleteSession(&sessionId, redisConnection).await;
     return match res {
         Ok(_) => Ok(String::from("Done")),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))

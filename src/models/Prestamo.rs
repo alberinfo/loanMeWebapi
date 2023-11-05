@@ -175,15 +175,14 @@ impl Prestamo {
         return Ok(());
     }
 
-    //////// HACEEEEEEEEER
-    /*pub async fn getAllLoanProposalsForUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<PrestamoPropuesta>, LoanError> {
-        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fk\" = $1 OR \"fkPrestatario\" = $1 ")
+    pub async fn getAllLoanProposalsForUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<PrestamoPropuesta>, LoanError> {
+        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" IN (SELECT ID FROM Prestamo WHERE fkPrestamista = $1 OR fkPrestatario = $2) ")
             .bind(UserId)
             .fetch_all(dbPool)
             .await?;
 
         return Ok(data);
-    }*/
+    }
 
     pub async fn completeLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;

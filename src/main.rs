@@ -31,6 +31,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         mailingState
     };
 
+    let payment: Router<appState::AppState, _> = axum::Router::new()
+        .route("/getAcceptedCurrencies", get(payments::getAcceptedCurrencies))
+        .route("/addTxn", post(payments::addTxn));
+
     let loans: Router<appState::AppState, _> = axum::Router::new()
         .route("/getLoanOffers", get(loans::getLoanOffers))
         .route("/getLoanRequests", get(loans::getLoanRequests))
@@ -38,8 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/createLoanOffer", post(loans::createLoanOffer))
         .route("/createLoanRequest", post(loans::createLoanRequest))
         .route("/proposeCompleteLoan", post(loans::proposeCompleteLoan))
-        .route("/completeLoan", patch(loans::completeLoan))
-        .route("/addTxn", post(loans::addTxn));
+        .route("/completeLoan", patch(loans::completeLoan));
 
     let profile: Router<appState::AppState, _> = axum::Router::new()
         .route("/getUserInfo", get(profile::getUserInfo))
@@ -60,6 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nest("/auth", auth)
         .nest("/profile", profile)
         .nest("/loans", loans)
+        .nest("/payment", payment)
         .layer(middleware::from_fn_with_state(appState.clone(), auth::validationLayer))
         .with_state(appState);
 

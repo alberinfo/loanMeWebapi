@@ -66,10 +66,10 @@ impl Session {
     }
 
     //When user logs out, probably.
-    pub async fn deleteSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
-        let username = Session::getSessionUserById(&self.id, redisConn).await?;
+    pub async fn deleteSession(sessionId: &String, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
+        let username = Session::getSessionUserById(sessionId, redisConn).await?;
 
-        redisConn.del(format!("{}{}", "sessionId", self.id)).await?;
+        redisConn.del(format!("{}{}", "sessionId", sessionId)).await?;
         redisConn.del(format!("{}{}", "sessionUser", username)).await?;
 
         return Ok(());

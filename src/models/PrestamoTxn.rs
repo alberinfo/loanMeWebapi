@@ -1,11 +1,14 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
+use strum::EnumIter;
+
 use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 use super::{Prestamo::{LoanError, Prestamo}, usuario::{Usuario, TipoUsuario}};
 
-#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Debug, Default)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Debug, EnumIter, Default)]
+#[serde(untagged)]
 #[sqlx(type_name = "AcceptedBlockchains", rename_all = "lowercase")]
 pub enum AcceptedBlockchains {
     #[default]
@@ -39,8 +42,8 @@ impl PrestamoTxn {
 
         match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista) {
             (TipoUsuario::Administrador, _) => return Err(LoanError::InvalidDate),
-            (TipoUsuario::Prestamista, Some(x)) => return Err(LoanError::UserUnauthorized { expected: TipoUsuario::Prestamista, found: TipoUsuario::Prestamista }), //If the user is a loaner and the the loan already has an assigned prestamist
-            (TipoUsuario::Prestatario, None /* If fkPrestamista is null then fkPrestatario is Some(x) */) => return Err(LoanError::UserUnauthorized { expected: TipoUsuario::Prestatario, found: TipoUsuario::Prestatario }),
+            (TipoUsuario::Prestamista, Some(x)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestamista) }), //If the user is a loaner and the the loan already has an assigned prestamist
+            (TipoUsuario::Prestatario, None /* If fkPrestamista is null then fkPrestatario is Some(x) */) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestatario) }),
 
             (_, _) => {} //anything not covered
         }
