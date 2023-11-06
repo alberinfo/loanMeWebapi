@@ -178,7 +178,16 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 
     let user = res.unwrap(); //User proposing completion
 
-    let _ = Prestamo::proposeCompleteLoan(proposal.LoanId, proposal.walletId, &user, dbPool);
+    let res = Prestamo::proposeCompleteLoan(proposal.LoanId, proposal.walletId, &user, dbPool).await;
+
+    if let Err(r) = res {
+        return match r {
+            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+        }
+    }
 
     let loan = Prestamo::getLoanById(proposal.LoanId, dbPool).await;
 

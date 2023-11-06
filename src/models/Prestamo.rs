@@ -165,24 +165,18 @@ impl Prestamo {
     pub async fn proposeCompleteLoan(LoanId: i64, walletId: Option<String>, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
+        if user.id == loan.fkPrestamista.unwrap() || user.id == loan.fkPrestatario.unwrap() {
+            return Err(LoanError::InvalidUser);
+        }
+
         let res = match &user.tipoUsuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
                 (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestamista) }),
                 (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestatario) }),
-                (usuario::TipoUsuario::Prestamista, None, _) => {
-                    if loan.fkPrestamista.unwrap() == user.id {
-                        return Err(LoanError::InvalidUser)
-                    }
-                    sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?
-                },
-                (usuario::TipoUsuario::Prestatario, _, None) => {
-                    if loan.fkPrestatario.unwrap() == user.id {
-                        return Err(LoanError::InvalidUser)
-                    }
-                    sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?
-                },
+                (usuario::TipoUsuario::Prestamista, None, _) => sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?,
+                (usuario::TipoUsuario::Prestatario, _, None) => sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?,
             }
         };
 
