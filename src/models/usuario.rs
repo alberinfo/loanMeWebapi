@@ -47,8 +47,6 @@ pub struct Usuario {
     #[serde(skip_serializing_if = "shouldSerializePwd")]
     pub contrasenna: String,
 
-    pub idWallet: Option<String>,
-
     pub tipoUsuario: Option<TipoUsuario>,
 
     #[serde(skip)]
@@ -106,12 +104,11 @@ impl Usuario {
     }
 
     pub async fn crearUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
-        let res = sqlx::query("INSERT INTO Usuario(email, \"nombreCompleto\", \"nombreUsuario\", contrasenna, \"idWallet\", \"tipoUsuario\", habilitado) VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let res = sqlx::query("INSERT INTO Usuario(email, \"nombreCompleto\", \"nombreUsuario\", contrasenna, \"tipoUsuario\", habilitado) VALUES($1, $2, $3, $4, $5, $6)")
             .bind(&self.email)
             .bind(&self.nombreCompleto)
             .bind(&self.nombreUsuario)
             .bind(&self.contrasenna)
-            .bind(&self.idWallet)
             .bind(self.tipoUsuario.as_ref().unwrap() as &TipoUsuario)
             .bind(false)
             .execute(dbPool)
@@ -122,11 +119,10 @@ impl Usuario {
     pub async fn actualizarUsuario(&self, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, UserError> {
         let usrId = Usuario::getUserId(&self.nombreUsuario, dbPool).await?;
 
-        let res = sqlx::query("UPDATE usuario SET email = $1, \"nombreUsuario\" = $2, contrasenna = $3, \"idWallet\" = $4 WHERE ID = $5")
+        let res = sqlx::query("UPDATE usuario SET email = $1, \"nombreUsuario\" = $2, contrasenna = $3 WHERE ID = $4")
             .bind(&self.email)
             .bind(&self.nombreUsuario)
             .bind(&self.contrasenna)
-            .bind(&self.idWallet)
             .bind(usrId)
             .execute(dbPool)
             .await?;

@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let loans: Router<appState::AppState, _> = axum::Router::new()
         .route("/getLoanOffers", get(loans::getLoanOffers))
         .route("/getLoanRequests", get(loans::getLoanRequests))
-        .route("/getLoanById", get(loans::getLoanById))
+        .route("/getLoanById/:LoanId", get(loans::getLoanById))
         .route("/createLoanOffer", post(loans::createLoanOffer))
         .route("/createLoanRequest", post(loans::createLoanRequest))
         .route("/proposeCompleteLoan", post(loans::proposeCompleteLoan))

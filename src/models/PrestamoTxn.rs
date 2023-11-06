@@ -7,20 +7,21 @@ use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 use super::{Prestamo::{LoanError, Prestamo}, usuario::{Usuario, TipoUsuario}};
 
-#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Debug, EnumIter, Default)]
-#[serde(untagged)]
-#[sqlx(type_name = "AcceptedBlockchains", rename_all = "lowercase")]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Debug, EnumIter, Default, Clone)]
+#[sqlx(type_name = "AcceptedBlockchains")]
 pub enum AcceptedBlockchains {
     #[default]
-    Monero
+    Monero,
+    Bitcoin,
+    BitcoinTestnet,
+    Ethereum,
+    EthereumTestnet
 }
 
 #[derive(sqlx::FromRow, sqlx::Type, serde::Serialize, serde::Deserialize, Debug)]
 pub struct PrestamoTxn {
     #[serde(skip_serializing, rename="LoanId")]
     pub fkPrestamo: i64,
-
-    pub blockchain: AcceptedBlockchains,
     pub txnId: String,
 }
 
@@ -48,9 +49,8 @@ impl PrestamoTxn {
             (_, _) => {} //anything not covered
         }
         
-        let res = sqlx::query("INSERT INTO PrestamoTxns(\"fkPrestamo\", blockchain, \"txnId\") VALUES($1, $2, $3)")
+        let res = sqlx::query("INSERT INTO PrestamoTxns(\"fkPrestamo\", \"txnId\") VALUES($1, $2)")
             .bind(self.fkPrestamo)
-            .bind(&self.blockchain as &AcceptedBlockchains)
             .bind(self.txnId.clone())
             .execute(dbPool)
             .await?;

@@ -43,7 +43,7 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
 
     if let Err(r) = allLoansFromUser {
         return match r {
-            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::DbError(ref err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
             LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))

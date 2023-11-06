@@ -23,6 +23,12 @@ pub struct InputPrestamo {
 }
 
 #[derive(serde::Deserialize, Debug)]
+pub struct InputProposal {
+    pub LoanId: i64,
+    pub walletId: Option<String>
+}
+
+#[derive(serde::Deserialize, Debug)]
 pub struct InputTxn {
     pub txn: PrestamoTxn
 }

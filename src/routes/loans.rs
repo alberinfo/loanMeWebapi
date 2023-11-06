@@ -1,11 +1,12 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
 
+use axum::extract::Path;
 use axum::http::header;
 use axum::{response::IntoResponse, Json, extract::State, http::StatusCode};
 use futures::StreamExt;
 
-use crate::models::InputTypes::{InputPrestamo, InputTxn};
+use crate::models::InputTypes::{InputPrestamo, InputTxn, InputProposal};
 use crate::models::PrestamoTxn::PrestamoTxn;
 use crate::models::{Prestamo::*, PrestamoTxn::*};
 use crate::models::session::Session;
@@ -72,7 +73,7 @@ pub async fn getLoanRequests(State(appState): State<appState::AppState>) -> impl
     return Ok(Json(LoanRequestsWithLoanees));
 }
 
-pub async fn getLoanById(State(appState): State<appState::AppState>, Json(LoanId): Json<i64>) -> impl IntoResponse {
+pub async fn getLoanById(State(appState): State<appState::AppState>, Path(LoanId): Path<i64>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
 
     let result = Prestamo::getLoanById(LoanId, dbPool).await;
@@ -98,6 +99,7 @@ pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, hea
     let redisConn = appState.redisState.getConnection().unwrap();
 
     let mut loan = payload.Loan;
+
     let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
     let res = Session::getSessionUserById(&sessionId, redisConn).await;
 
@@ -130,6 +132,7 @@ pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, h
     let redisConn = appState.redisState.getConnection().unwrap();
 
     let mut loan = payload.Loan;
+
     let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
     let res = Session::getSessionUserById(&sessionId, redisConn).await;
 
@@ -157,7 +160,7 @@ pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, h
     }
 }
 
-pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(LoanId): Json<i64>) -> impl IntoResponse {
+pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(proposal): Json<InputProposal>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConn = appState.redisState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
@@ -175,9 +178,9 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 
     let user = res.unwrap(); //User proposing completion
 
-    let _ = Prestamo::proposeCompleteLoan(LoanId, &user, dbPool);
+    let _ = Prestamo::proposeCompleteLoan(proposal.LoanId, proposal.walletId, &user, dbPool);
 
-    let loan = Prestamo::getLoanById(LoanId, dbPool).await;
+    let loan = Prestamo::getLoanById(proposal.LoanId, dbPool).await;
 
     if let Err(r) = loan {
         return match r {
@@ -188,7 +191,7 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
         }
     }
 
-    let loan = loan.unwrap();
+    let loan = loan.unwrap(); 
 
     let res = Usuario::buscarUsuarioById(loan.fkPrestamista.unwrap_or(loan.fkPrestatario.unwrap()), dbPool).await; //If fkPrestamista is None, then fkPrestatario surely is Some, and viceversa
 
@@ -210,7 +213,6 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 
 pub async fn completeLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
-    let redisConn = appState.redisState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
 
     let res = Usuario::buscarUsuarioById(completionProposal.fkUsuario, dbPool).await;

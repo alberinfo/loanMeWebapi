@@ -2,7 +2,7 @@
 #![allow(clippy::needless_return)]
 
 use bigdecimal::BigDecimal;
-use super::{usuario, PrestamoTxn::PrestamoTxn};
+use super::{usuario, PrestamoTxn::{PrestamoTxn, AcceptedBlockchains}};
 use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 #[derive(thiserror::Error, Debug)]
@@ -42,6 +42,10 @@ pub struct Prestamo {
     pub plazoPago: chrono::NaiveDateTime,
     pub intervaloPago: String, //Likely to change
     pub riesgo: i32,
+
+    pub walletId: String,
+
+    pub walletChain: AcceptedBlockchains,
 
     #[serde(skip_serializing)]
     pub fkPrestatario: Option<i64>,
@@ -88,7 +92,7 @@ impl Prestamo {
     }
 
     pub async fn getLoanById(id: i64, dbPool: &sqlx::PgPool) -> Result<Prestamo, LoanError> {
-        let data = sqlx::query_as::<_, Prestamo>("SELECT Prestamo.*, (SELECT * FROM PrestamoTxn WHERE \"fkPrestamo\" = $1) AS txns FROM Prestamo WHERE ID = $1")
+        let data = sqlx::query_as::<_, Prestamo>("SELECT Prestamo.* FROM Prestamo WHERE ID = $1")
             .bind(id)
             .fetch_one(dbPool)
             .await?;
@@ -111,13 +115,15 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
             .bind(self.plazoPago)
             .bind(&self.intervaloPago)
             .bind(self.riesgo)
+            .bind(&self.walletId)
+            .bind(&self.walletChain)
             .bind(offerer.id)
             .execute(dbPool)
             .await?;
@@ -140,20 +146,23 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
             .bind(self.plazoPago)
             .bind(&self.intervaloPago)
             .bind(self.riesgo)
+            .bind(&self.walletId)
+            .bind(&self.walletChain)
             .bind(requester.id)
             .execute(dbPool)
             .await?;
+
         return Ok(());
     }
 
-    pub async fn proposeCompleteLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn proposeCompleteLoan(LoanId: i64, walletId: Option<String>, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
         let res = match &user.tipoUsuario {
@@ -162,13 +171,18 @@ impl Prestamo {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
                 (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestamista) }),
                 (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestatario) }),
-                (usuario::TipoUsuario::Prestamista, None, _) | (usuario::TipoUsuario::Prestatario, _, None) => {
-                    if loan.fkPrestatario.unwrap() == user.id {
+                (usuario::TipoUsuario::Prestamista, None, _) => {
+                    if loan.fkPrestamista.unwrap() == user.id {
                         return Err(LoanError::InvalidUser)
                     }
                     sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?
                 },
-
+                (usuario::TipoUsuario::Prestatario, _, None) => {
+                    if loan.fkPrestatario.unwrap() == user.id {
+                        return Err(LoanError::InvalidUser)
+                    }
+                    sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?
+                },
             }
         };
 
@@ -176,7 +190,7 @@ impl Prestamo {
     }
 
     pub async fn getAllLoanProposalsForUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<PrestamoPropuesta>, LoanError> {
-        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" IN (SELECT ID FROM Prestamo WHERE fkPrestamista = $1 OR fkPrestatario = $2) ")
+        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" IN (SELECT ID FROM Prestamo WHERE \"fkPrestamista\" = $1 OR \"fkPrestatario\" = $1) ")
             .bind(UserId)
             .fetch_all(dbPool)
             .await?;
