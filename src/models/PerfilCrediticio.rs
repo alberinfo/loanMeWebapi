@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

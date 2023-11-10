@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use bigdecimal::BigDecimal;
 use super::{usuario, PrestamoTxn::{PrestamoTxn, AcceptedBlockchains}};
@@ -58,7 +60,8 @@ pub struct Prestamo {
 pub struct LoanItem {
     pub loan: Prestamo,
     pub txns: Vec<PrestamoTxn>,
-    pub user: super::usuario::Usuario
+    pub prestamista: Option<super::usuario::Usuario>,
+    pub prestatario: Option<super::usuario::Usuario>
 }
 
 #[derive(sqlx::FromRow, serde::Deserialize, serde::Serialize, Default, Debug)]
@@ -169,7 +172,7 @@ impl Prestamo {
             return Err(LoanError::InvalidUser);
         }
 
-        let res = match &user.tipoUsuario {
+        let _ = match &user.tipoUsuario {
             None => return Err(LoanError::InvalidUserType { found: None }),
             Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
@@ -201,11 +204,9 @@ impl Prestamo {
             .fetch_optional(dbPool)
             .await?;
 
-        if let None = proposal {
+        if proposal.is_none() {
             return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestamista), found: None });
         }
-
-        let proposal = proposal.unwrap();
         
         let _ = match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista, loan.fkPrestatario) {
             (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1 WHERE ID = $2").bind(user.id).bind(LoanId).execute(dbPool).await?,

@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 
     let mut mailingState = mailing::mailingState::default();
-    mailingState.connect().await?;
+    let _ = mailingState.connect();
 
     let appState = appState::AppState {
         dbState,

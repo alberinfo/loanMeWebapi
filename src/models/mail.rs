@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use lettre::{Message, message::header::ContentType, AsyncSmtpTransport, Tokio1Executor, AsyncTransport, transport::smtp::response::Response};
 use redis::AsyncCommands;
@@ -38,7 +40,6 @@ impl Mail {
     pub async fn get(IdType: &str, id: &String, redisConn: &mut redis::aio::ConnectionManager) -> Result<Mail, redis::RedisError> {
         match IdType {
             "confirmationId" => {
-                println!("LMAOOO {}", id);
                 let userJson = redisConn.get_del::<String, String>(format!("{}{}", "confirmationId", id)).await?;
                 let mut user: Usuario = serde_json::from_str(&userJson).unwrap();
                 user.contrasenna.pop(); //remover el "*"
@@ -69,7 +70,7 @@ impl Mail {
                 Usuario.contrasenna.push('*');
                 redisConn.set_ex::<String, String, String>(format!("{}{}", "restoreId", RestoreId), serde_json::to_string(Usuario).unwrap(), DEFAULT_PWDRESTORE_EXPIRATION).await?;
             },
-            Mail::Test | _ => {},
+            Mail::LoanProposal(_, _, _) | Mail::LoanProposalAccepted(_, _) | Mail::Test => {}
         }
 
         return Ok(());
@@ -83,7 +84,7 @@ impl Mail {
                     .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Confirm your signup in order to use your account")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("http://localhost:4433/validateUser/?token={}", ConfirmationId))?
+                    .body(format!("http://localhost:4433/validateUser/?token={ConfirmationId}"))?
             },
             Mail::PwdRestore(Usuario, RestoreId) => {
                 Message::builder()
@@ -91,7 +92,7 @@ impl Mail {
                     .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Restore pwd")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("http://localhost:4433/restorePwd/?token={}", RestoreId))?
+                    .body(format!("http://localhost:4433/restorePwd/?token={RestoreId}"))?
             },
             Mail::LoanProposal(LoanCreator, LoanCompleter, LoanId) => {
                 Message::builder()
@@ -99,7 +100,7 @@ impl Mail {
                     .to(format!("{} <{}>", LoanCreator.nombreCompleto, LoanCreator.email).parse()?)
                     .subject("Loan completion proposal")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("User {} wants to be your other half! See your loan here http://localhost:4433/getLoanById/{}", LoanCompleter.nombreUsuario, LoanId))?
+                    .body(format!("User {} wants to be your other half! See your loan here http://localhost:4433/getLoanById/{LoanId}", LoanCompleter.nombreUsuario))?
             },
             Mail::LoanProposalAccepted(LoanCompleter, LoanId) => {
                 Message::builder()
@@ -107,7 +108,7 @@ impl Mail {
                     .to(format!("{} <{}>", LoanCompleter.nombreCompleto, LoanCompleter.email).parse()?)
                     .subject("Loan proposal accepted")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("Your loan completion proposal has been accepted! See the loan here http://localhost:4433/getLoanById/{}", LoanId))?
+                    .body(format!("Your loan completion proposal has been accepted! See the loan here http://localhost:4433/getLoanById/{LoanId}"))?
             }
             Mail::Test => {
                 return Err(MailError::Test);

@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use argon2::{
     password_hash::{ rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString },
@@ -26,8 +28,8 @@ pub enum TipoUsuario {
     Administrador
 }
 
-fn shouldSerializePwd(s: &String) -> bool {
-    return s.chars().last().unwrap() != '*';
+fn shouldSerializePwd(s: &str) -> bool {
+    return s.ends_with('*');
 }
 
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -85,6 +87,7 @@ impl Usuario {
     }
 
     pub async fn buscarUsuarioById(id: i64, dbPool: &sqlx::PgPool) -> Result<Usuario, UserError> {
+
         let usuario: Usuario = sqlx::query_as::<_, Usuario>("SELECT * FROM usuario WHERE id = $1")
             .bind(id)
             .fetch_one(dbPool)

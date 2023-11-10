@@ -1,3 +1,6 @@
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+
 use axum::{response::IntoResponse, extract::State, http::{header, StatusCode}, Json};
 use strum::IntoEnumIterator;
 use crate::{models::{PrestamoTxn::AcceptedBlockchains, InputTypes::InputTxn, session::Session, usuario::Usuario, Prestamo::LoanError}, services::appState};
@@ -7,7 +10,7 @@ pub async fn getAcceptedCurrencies() -> impl IntoResponse {
 
     let ret = serde_json::to_string(&acceptedCurrencies);
 
-    if let Err(r) = ret {
+    if let Err(_r) = ret {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, "There was an error while fetching the data. Try again later"));
     }
 

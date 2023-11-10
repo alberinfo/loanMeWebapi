@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next, TypedHeader};
 
@@ -106,7 +108,7 @@ pub async fn register(State(mut appState): State<appState::AppState>, Json(paylo
 
 
 
-    let mut confirmationMail = mail::Mail::SignupConfirm(usuario.clone(), String::from(""));
+    let mut confirmationMail = mail::Mail::SignupConfirm(usuario.clone(), String::new());
     let saveRes = confirmationMail.save(redisConnection).await;
 
     if let Err(_err) = saveRes {
@@ -187,7 +189,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
 
     let mut oldSession = Session {
         username: usuario.nombreUsuario.clone(),
-        id: String::from(""),
+        id: String::new(),
         creationDate: None
     };
 
@@ -205,7 +207,7 @@ pub async fn login(State(mut appState): State<appState::AppState>, Json(payload)
     let nuevaSession = Session::new(usuario.nombreUsuario).await;
     let res = nuevaSession.createSession(redisConnection).await;
     return match res {
-        Ok(_) => Ok(Json(nuevaSession)),
+        Ok(()) => Ok(Json(nuevaSession)),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     };
 }
@@ -217,7 +219,7 @@ pub async fn logout(State(mut appState): State<appState::AppState>, headers: hea
 
     let res = Session::deleteSession(&sessionId, redisConnection).await;
     return match res {
-        Ok(_) => Ok(String::from("Done")),
+        Ok(()) => Ok(String::from("Done")),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))))
     };
 }

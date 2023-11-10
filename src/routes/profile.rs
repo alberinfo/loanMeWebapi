@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use std::collections::HashMap;
 
@@ -188,7 +190,7 @@ pub async fn requestRestorePwd(State(mut appState): State<appState::AppState>, J
     }
 
     let user = user.unwrap();
-    let mut mail = Mail::PwdRestore(user, String::from(""));
+    let mut mail = Mail::PwdRestore(user, String::new());
 
     let res = mail.save(redisConn).await;
 
@@ -236,5 +238,5 @@ pub async fn restorePwd(State(mut appState): State<appState::AppState>, Path(res
     }
 
     //This will not happen.
-    return Ok(String::from(""));
+    return Ok(String::new());
 }

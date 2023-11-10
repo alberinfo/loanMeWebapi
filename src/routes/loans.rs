@@ -1,17 +1,19 @@
 #![allow(non_snake_case)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 use axum::extract::Path;
 use axum::http::header;
 use axum::{response::IntoResponse, Json, extract::State, http::StatusCode};
 use futures::StreamExt;
 
-use crate::models::InputTypes::{InputPrestamo, InputTxn, InputProposal};
+use crate::models::InputTypes::{InputPrestamo, InputProposal};
 use crate::models::PrestamoTxn::PrestamoTxn;
-use crate::models::{Prestamo::*, PrestamoTxn::*};
+use crate::models::{Prestamo::*};
 use crate::models::session::Session;
 use crate::models::usuario::Usuario;
-use crate::models::mail::{self, Mail};
+use crate::models::mail::{self};
 use crate::services::appState;
 
 pub async fn getLoanOffers(State(appState): State<appState::AppState>) -> impl IntoResponse {
@@ -30,7 +32,8 @@ pub async fn getLoanOffers(State(appState): State<appState::AppState>) -> impl I
         let loanItem = LoanItem {
             loan: LoanOffer,
             txns: Vec::new(),
-            user: Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap()
+            prestamista: Some(Usuario::buscarUsuarioById(fkPrestamista, dbPool).await.unwrap()),
+            prestatario: None
         };
 
         loanItem
@@ -55,12 +58,13 @@ pub async fn getLoanRequests(State(appState): State<appState::AppState>) -> impl
     let LoanRequests: Vec<Prestamo> = result.unwrap();
 
     let Futures: futures::stream::FuturesOrdered<_> = LoanRequests.into_iter().map(|LoanRequest: Prestamo| async move {
-        let fkPrestatario = LoanRequest.fkPrestatario.unwrap();
-        
+        let fkPrestatario = LoanRequest.fkPrestatario;
+
         let loanItem = LoanItem {
             loan: LoanRequest,
             txns: Vec::new(),
-            user: Usuario::buscarUsuarioById(fkPrestatario, dbPool).await.unwrap()
+            prestatario: Some(Usuario::buscarUsuarioById(fkPrestatario.unwrap(), dbPool).await.unwrap()),
+            prestamista: None
         };
 
         loanItem
@@ -84,11 +88,13 @@ pub async fn getLoanById(State(appState): State<appState::AppState>, Path(LoanId
 
     let result = result.unwrap();
 
-    let fkUsuario = result.fkPrestamista.unwrap_or(result.fkPrestatario.unwrap());
+    let prestamista = if result.fkPrestamista.is_none() {None} else {Some(Usuario::buscarUsuarioById(result.fkPrestamista.unwrap(), dbPool).await.unwrap())};
+    let prestatario = if result.fkPrestatario.is_none() {None} else {Some(Usuario::buscarUsuarioById(result.fkPrestatario.unwrap(), dbPool).await.unwrap())};
     let LoanWithUser = LoanItem {
         loan: result,
         txns: PrestamoTxn::getAllTxns(LoanId, dbPool).await.unwrap(),
-        user: Usuario::buscarUsuarioById(fkUsuario, dbPool).await.unwrap()
+        prestamista,
+        prestatario,
     };
 
     return Ok(Json(LoanWithUser));
@@ -216,11 +222,11 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
     return match sendRes {
         Ok(_r) => Ok(String::from("Done")),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
-    };;
+    };
 }
 
 
-pub async fn completeLoan(State(mut appState): State<appState::AppState>, headers: header::HeaderMap, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
+pub async fn completeLoan(State(appState): State<appState::AppState>, headers: header::HeaderMap, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
 
@@ -257,5 +263,5 @@ pub async fn completeLoan(State(mut appState): State<appState::AppState>, header
     return match sendRes {
         Ok(_r) => Ok(String::from("Done")),
         Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
-    };;
+    };
 }
