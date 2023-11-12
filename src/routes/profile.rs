@@ -6,8 +6,9 @@
 use std::collections::HashMap;
 
 use axum::{http::{StatusCode, header}, response::IntoResponse, Json, extract::{State, Path}};
+use futures::StreamExt;
 
-use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}, Prestamo::{Prestamo, LoanError}}};
+use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}, Prestamo::{Prestamo, LoanError}, PrestamoPropuesta::{PrestamoPropuesta, PropuestaItem}}};
 
 //Reads current user info
 pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
@@ -45,27 +46,40 @@ pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers
 
     if let Err(r) = allLoansFromUser {
         return match r {
-            LoanError::DbError(ref err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
+            LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { ..} => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 
     response.extra.insert(String::from("loans"), serde_json::to_value(allLoansFromUser.unwrap()).unwrap());
 
-    let allLoanProposals = Prestamo::getAllLoanProposalsForUser(user.id, dbPool).await;
+    let allLoanProposals = PrestamoPropuesta::getAllLoanProposalsForUser(user.id, dbPool).await;
 
     if let Err(r) = allLoanProposals {
         return match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 
-    response.extra.insert(String::from("loanProposals"), serde_json::to_value(allLoanProposals.unwrap()).unwrap());
+    let allLoanProposals = allLoanProposals.unwrap();
+
+    let futures: futures::stream::FuturesOrdered<_> = allLoanProposals.into_iter().map(|LoanProposal: PrestamoPropuesta| async move {
+        let PropuestaItem = PropuestaItem {
+            fkPrestamo: LoanProposal.fkPrestamo,
+            usuario: Usuario::buscarUsuarioById(LoanProposal.fkUsuario, dbPool).await.unwrap()
+        };
+
+        PropuestaItem
+    }).collect();
+
+    let allLoanProposals: Vec<PropuestaItem> = futures.collect().await;
+
+    response.extra.insert(String::from("loanProposals"), serde_json::to_value(allLoanProposals).unwrap());
 
     return Ok(Json(response));
 }

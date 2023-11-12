@@ -4,7 +4,7 @@
 #![allow(clippy::missing_panics_doc)]
 
 use bigdecimal::BigDecimal;
-use super::{usuario, PrestamoTxn::{PrestamoTxn, AcceptedBlockchains}};
+use super::{usuario, PrestamoTxn::{PrestamoTxn, AcceptedBlockchains}, PrestamoPropuesta::PrestamoPropuesta};
 use crate::services::misc::{deserializeNaiveDateTime, serializeNaiveDateTime};
 
 #[derive(thiserror::Error, Debug)]
@@ -62,16 +62,6 @@ pub struct LoanItem {
     pub txns: Vec<PrestamoTxn>,
     pub prestamista: Option<super::usuario::Usuario>,
     pub prestatario: Option<super::usuario::Usuario>
-}
-
-#[derive(sqlx::FromRow, serde::Deserialize, serde::Serialize, Default, Debug)]
-#[serde(rename = "LoanProposal")]
-pub struct PrestamoPropuesta {
-    #[serde(rename = "LoanId")]
-    pub fkPrestamo: i64,
-
-    #[serde(rename = "UserId")]
-    pub fkUsuario: i64
 }
 
 impl Prestamo {
@@ -165,44 +155,10 @@ impl Prestamo {
         return Ok(());
     }
 
-    pub async fn proposeCompleteLoan(LoanId: i64, walletId: Option<String>, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
-        let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
-
-        if user.id == loan.fkPrestamista.unwrap() || user.id == loan.fkPrestatario.unwrap() {
-            return Err(LoanError::InvalidUser);
-        }
-
-        let _ = match &user.tipoUsuario {
-            None => return Err(LoanError::InvalidUserType { found: None }),
-            Some(x) => match (x, loan.fkPrestamista, loan.fkPrestatario) {
-                (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
-                (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestamista) }),
-                (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestatario) }),
-                (usuario::TipoUsuario::Prestamista, None, _) => sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?,
-                (usuario::TipoUsuario::Prestatario, _, None) => sqlx::query("INSERT PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?,
-            }
-        };
-
-        return Ok(());
-    }
-
-    pub async fn getAllLoanProposalsForUser(UserId: i64, dbPool: &sqlx::PgPool) -> Result<Vec<PrestamoPropuesta>, LoanError> {
-        let data = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" IN (SELECT ID FROM Prestamo WHERE \"fkPrestamista\" = $1 OR \"fkPrestatario\" = $1) ")
-            .bind(UserId)
-            .fetch_all(dbPool)
-            .await?;
-
-        return Ok(data);
-    }
-
     pub async fn completeLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
-        let proposal = sqlx::query_as::<_, PrestamoPropuesta>("SELECT * FROM PrestamoPropuesta WHERE \"fkPrestamo\" = $1 AND \"fkUsuario\" = $2")
-            .bind(LoanId)
-            .bind(user.id)
-            .fetch_optional(dbPool)
-            .await?;
+        let proposal = PrestamoPropuesta::getLoanProposalById(LoanId, user.id, dbPool).await?;
 
         if proposal.is_none() {
             return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestamista), found: None });
@@ -214,7 +170,7 @@ impl Prestamo {
             (_, _, _) => return Err(LoanError::InvalidUser)
         };
 
-        let _ = sqlx::query("DELETE FROM PrestamoPropuestas WHERE \"fkPrestamo\" = $1 ").bind(LoanId).execute(dbPool).await?;
+        let _ = PrestamoPropuesta::clearLoanProposals(LoanId, dbPool).await?;
 
         return Ok(());
     }

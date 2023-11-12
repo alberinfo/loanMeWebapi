@@ -9,6 +9,7 @@ use axum::{response::IntoResponse, Json, extract::State, http::StatusCode};
 use futures::StreamExt;
 
 use crate::models::InputTypes::{InputPrestamo, InputProposal};
+use crate::models::PrestamoPropuesta::PrestamoPropuesta;
 use crate::models::PrestamoTxn::PrestamoTxn;
 use crate::models::{Prestamo::*};
 use crate::models::session::Session;
@@ -127,8 +128,8 @@ pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, hea
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { ..} => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 }
@@ -160,8 +161,8 @@ pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, h
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 }
@@ -184,14 +185,14 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 
     let user = res.unwrap(); //User proposing completion
 
-    let res = Prestamo::proposeCompleteLoan(proposal.LoanId, proposal.walletId, &user, dbPool).await;
+    let res = PrestamoPropuesta::proposeCompleteLoan(proposal.LoanId, proposal.walletId, &user, dbPool).await;
 
     if let Err(r) = res {
         return match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 
@@ -201,14 +202,16 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
         return match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 
     let loan = loan.unwrap(); 
 
-    let res = Usuario::buscarUsuarioById(loan.fkPrestamista.unwrap_or(loan.fkPrestatario.unwrap()), dbPool).await; //If fkPrestamista is None, then fkPrestatario surely is Some, and viceversa
+    let creatorId = if let Some(x) = loan.fkPrestamista { x } else { loan.fkPrestatario.unwrap() }; //If one is None then the other is Some(x)
+
+    let res = Usuario::buscarUsuarioById(creatorId, dbPool).await; //If fkPrestamista is None, then fkPrestatario surely is Some, and viceversa
 
     if let Err(err) = res {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
@@ -226,7 +229,7 @@ pub async fn proposeCompleteLoan(State(mut appState): State<appState::AppState>,
 }
 
 
-pub async fn completeLoan(State(appState): State<appState::AppState>, headers: header::HeaderMap, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
+pub async fn completeLoan(State(appState): State<appState::AppState>, Json(completionProposal): Json<PrestamoPropuesta>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
 
@@ -243,8 +246,8 @@ pub async fn completeLoan(State(appState): State<appState::AppState>, headers: h
         return match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 

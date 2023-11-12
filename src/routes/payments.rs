@@ -1,5 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+#![allow(clippy::needless_return)]
 
 use axum::{response::IntoResponse, extract::State, http::{header, StatusCode}, Json};
 use strum::IntoEnumIterator;
@@ -43,8 +44,8 @@ pub async fn addTxn(State(mut appState): State<appState::AppState>, headers: hea
         Err(r) => match r {
             LoanError::DbError(ref _err) => Err((StatusCode::INTERNAL_SERVER_ERROR, r.to_string())),
             LoanError::InvalidDate | LoanError::InvalidUser => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::InvalidUserType { ref found } => Err((StatusCode::BAD_REQUEST, r.to_string())),
-            LoanError::UserUnauthorized { ref expected, ref found} => Err((StatusCode::FORBIDDEN, r.to_string()))
+            LoanError::InvalidUserType { .. } => Err((StatusCode::BAD_REQUEST, r.to_string())),
+            LoanError::UserUnauthorized { .. } => Err((StatusCode::FORBIDDEN, r.to_string()))
         }
     }
 }

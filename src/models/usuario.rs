@@ -29,7 +29,7 @@ pub enum TipoUsuario {
 }
 
 fn shouldSerializePwd(s: &str) -> bool {
-    return s.ends_with('*');
+    return !s.ends_with('*');
 }
 
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]

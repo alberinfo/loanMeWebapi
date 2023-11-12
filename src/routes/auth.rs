@@ -3,7 +3,7 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 
-use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next, TypedHeader};
+use axum::{http::{StatusCode, Request, header}, response::{IntoResponse, Response}, Json, extract::{State, Path}, middleware::Next};
 
 use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, mail::{self, Mail}}};
 use crate::models::{usuario::Usuario, usuario::UserError, session::Session};

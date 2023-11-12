@@ -6,7 +6,6 @@
 use lettre::{Message, message::header::ContentType, AsyncSmtpTransport, Tokio1Executor, AsyncTransport, transport::smtp::response::Response};
 use redis::AsyncCommands;
 
-use super::Prestamo::Prestamo;
 use super::usuario::Usuario;
 use crate::services::misc::generateRnd;
 use crate::services::redisServer::{DEFAULT_MAILCONF_EXPIRATION, DEFAULT_PWDRESTORE_EXPIRATION};
