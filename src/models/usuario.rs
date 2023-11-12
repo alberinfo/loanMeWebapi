@@ -28,14 +28,18 @@ pub enum TipoUsuario {
     Administrador
 }
 
-fn shouldSerializePwd(s: &str) -> bool {
+fn shouldSkipId(x: &i64) -> bool {
+    return x == &0;
+}
+
+fn shouldSkipPwd(s: &str) -> bool {
     return !s.ends_with('*');
 }
 
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip_deserializing)]
+    #[serde(skip_deserializing, skip_serializing_if="shouldSkipId")]
     pub id: i64,
 
     #[serde(default)]
@@ -46,7 +50,7 @@ pub struct Usuario {
 
     pub nombreUsuario: String,
 
-    #[serde(skip_serializing_if = "shouldSerializePwd")]
+    #[serde(skip_serializing_if = "shouldSkipPwd")]
     pub contrasenna: String,
 
     pub tipoUsuario: Option<TipoUsuario>,

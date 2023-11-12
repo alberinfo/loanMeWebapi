@@ -109,7 +109,7 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"returnWalletId\", \"walletChain\", \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"returnWalletId\", \"walletChain\", \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
@@ -141,7 +141,7 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)

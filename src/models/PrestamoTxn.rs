@@ -35,23 +35,23 @@ impl PrestamoTxn {
     }
 
     pub async fn addTxn(&self, user: &Usuario, dbPool: &sqlx::PgPool) -> Result<sqlx::postgres::PgQueryResult, LoanError> {
-        if user.tipoUsuario.clone().unwrap() == TipoUsuario::Administrador {
+        if user.tipoUsuario == Some(TipoUsuario::Administrador) {
             return Err(LoanError::InvalidUserType { found: Some(TipoUsuario::Administrador) })
         }
         
         let loan = Prestamo::getLoanById(self.fkPrestamo, dbPool).await?;
 
-        match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista) {
-            (TipoUsuario::Administrador, _) => return Err(LoanError::InvalidDate),
-            (TipoUsuario::Prestamista, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestamista) }), //If the user is a loaner and the the loan already has an assigned prestamist
-            (TipoUsuario::Prestatario, None /* If fkPrestamista is null then fkPrestatario is Some(x) */) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestatario) }),
+        match (&user.tipoUsuario, loan.fkPrestamista) {
+            (Some(TipoUsuario::Administrador), _) => return Err(LoanError::InvalidDate),
+            (Some(TipoUsuario::Prestamista), Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestamista) }), //If the user is a loaner and the the loan already has an assigned prestamist
+            (Some(TipoUsuario::Prestatario), None /* If fkPrestamista is null then fkPrestatario is Some(x) */) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestatario) }),
 
             (_, _) => {} //anything not covered
         }
         
         let res = sqlx::query("INSERT INTO PrestamoTxns(\"fkPrestamo\", \"txnId\") VALUES($1, $2)")
             .bind(self.fkPrestamo)
-            .bind(self.txnId.clone())
+            .bind(&self.txnId)
             .execute(dbPool)
             .await?;
         return Ok(res);

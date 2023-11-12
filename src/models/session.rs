@@ -36,8 +36,8 @@ impl Session {
 
     pub async fn createSession(&self, redisConn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<()> {
         //Generic params are: param1, param2, return type.
-        redisConn.set_ex::<String, String, String>(format!("{}{}", "sessionId", self.id), self.username.clone(), DEFAULT_SESSION_EXPIRATION).await?;
-        redisConn.set_ex::<String, String, String>(format!("{}{}", "sessionUser", self.username), self.id.clone(), DEFAULT_SESSION_EXPIRATION).await?;
+        redisConn.set_ex::<String, &String, String>(format!("{}{}", "sessionId", self.id), &self.username, DEFAULT_SESSION_EXPIRATION).await?;
+        redisConn.set_ex::<String, &String, String>(format!("{}{}", "sessionUser", self.username), &self.id, DEFAULT_SESSION_EXPIRATION).await?;
         return Ok(());
     }
 
