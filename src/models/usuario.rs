@@ -35,7 +35,7 @@ fn shouldSerializePwd(s: &str) -> bool {
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip)]
+    #[serde(skip_deserializing)]
     pub id: i64,
 
     #[serde(default)]

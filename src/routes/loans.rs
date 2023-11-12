@@ -107,6 +107,14 @@ pub async fn createLoanOffer(State(mut appState): State<appState::AppState>, hea
 
     let mut loan = payload.Loan;
 
+    if loan.walletId.len() > 0 {
+        return Err((StatusCode::BAD_REQUEST, String::from("walletId has to be blank")));
+    }
+
+    if loan.returnWalletId.len() == 0 {
+        return Err((StatusCode::BAD_REQUEST, String::from("returnWalletId has to be anotated")));
+    }
+
     let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
     let res = Session::getSessionUserById(&sessionId, redisConn).await;
 
@@ -139,6 +147,14 @@ pub async fn createLoanRequest(State(mut appState): State<appState::AppState>, h
     let redisConn = appState.redisState.getConnection().unwrap();
 
     let mut loan = payload.Loan;
+
+    if loan.walletId.len() == 0 {
+        return Err((StatusCode::BAD_REQUEST, String::from("walletId has to be anotated")));
+    }
+
+    if loan.returnWalletId.len() > 0 {
+        return Err((StatusCode::BAD_REQUEST, String::from("returnWalletId has to be blank")));
+    }
 
     let sessionId = headers.get(axum::http::header::AUTHORIZATION).and_then(|header| header.to_str().ok()).unwrap().to_string(); //in auth.rs we already confirmed header is Some(value)
     let res = Session::getSessionUserById(&sessionId, redisConn).await;
@@ -240,7 +256,7 @@ pub async fn completeLoan(State(appState): State<appState::AppState>, Json(compl
 
     let user = res.unwrap();
     
-    let res = Prestamo::completeLoan(completionProposal.fkPrestamo, &user, dbPool).await;
+    let res = Prestamo::completeLoan(completionProposal.fkPrestamo, &completionProposal.walletId, &user, dbPool).await;
 
     if let Err(r) = res {
         return match r {

@@ -9,6 +9,7 @@ CREATE TABLE Prestamo(
     "intervaloPago" TEXT NOT NULL,
     riesgo INT NOT NULL CHECK (riesgo > 0),
     "walletId" TEXT NOT NULL,
+    "returnWalletId" TEXT NOT NULL,
     "walletChain" AcceptedBlockchains NOT NULL,
     "fkPrestatario" BIGINT REFERENCES Usuario(ID),
     "fkPrestamista" BIGINT REFERENCES Usuario(ID),

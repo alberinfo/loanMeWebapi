@@ -6,6 +6,8 @@ pub struct PrestamoPropuesta {
     #[serde(rename = "LoanId")]
     pub fkPrestamo: i64,
 
+    pub walletId: String,
+
     #[serde(rename = "UserId")]
     pub fkUsuario: i64
 }
@@ -62,7 +64,7 @@ impl PrestamoPropuesta {
     }
 
     pub async fn clearLoanProposals(LoanId: i64, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
-        let _ = sqlx::query("DELETE FROM PrestamoPropuestas WHERE \"fkPrestamo\" = $1 ").bind(LoanId).execute(dbPool).await?;
+        let _ = sqlx::query("DELETE FROM PrestamoPropuesta WHERE \"fkPrestamo\" = $1 ").bind(LoanId).execute(dbPool).await?;
         Ok(())
     }
 }

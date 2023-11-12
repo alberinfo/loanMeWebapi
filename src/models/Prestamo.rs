@@ -46,6 +46,7 @@ pub struct Prestamo {
     pub riesgo: i32,
 
     pub walletId: String,
+    pub returnWalletId: String,
 
     pub walletChain: AcceptedBlockchains,
 
@@ -108,14 +109,15 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"returnWalletId\", \"walletChain\", \"fkPrestamista\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
             .bind(self.plazoPago)
             .bind(&self.intervaloPago)
             .bind(self.riesgo)
-            .bind(&self.walletId)
+            .bind(&String::new()) //WalletId
+            .bind(&self.returnWalletId)
             .bind(&self.walletChain)
             .bind(offerer.id)
             .execute(dbPool)
@@ -147,6 +149,7 @@ impl Prestamo {
             .bind(&self.intervaloPago)
             .bind(self.riesgo)
             .bind(&self.walletId)
+            .bind(&String::new()) // returnWalletId
             .bind(&self.walletChain)
             .bind(requester.id)
             .execute(dbPool)
@@ -155,7 +158,7 @@ impl Prestamo {
         return Ok(());
     }
 
-    pub async fn completeLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn completeLoan(LoanId: i64, walletId: &String, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
         let proposal = PrestamoPropuesta::getLoanProposalById(LoanId, user.id, dbPool).await?;
@@ -165,8 +168,8 @@ impl Prestamo {
         }
         
         let _ = match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista, loan.fkPrestatario) {
-            (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1 WHERE ID = $2").bind(user.id).bind(LoanId).execute(dbPool).await?,
-            (usuario::TipoUsuario::Prestatario, Some(_), None) => sqlx::query("UPDATE Prestamo SET \"fkPrestatario\" = $1 WHERE ID = $2").bind(user.id).bind(LoanId).execute(dbPool).await?,
+            (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1, \"returnWalletId\" = $2 WHERE ID = $3").bind(user.id).bind(walletId).bind(LoanId).execute(dbPool).await?,
+            (usuario::TipoUsuario::Prestatario, Some(_), None) => sqlx::query("UPDATE Prestamo SET \"fkPrestatario\" = $1, \"walletId\" = $2 WHERE ID = $3").bind(user.id).bind(walletId).bind(LoanId).execute(dbPool).await?,
             (_, _, _) => return Err(LoanError::InvalidUser)
         };
 
