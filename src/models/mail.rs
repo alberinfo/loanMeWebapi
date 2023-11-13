@@ -84,7 +84,7 @@ impl Mail {
                     .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Confirm your signup in order to use your account")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("http://localhost:4433/validateUser/?token={ConfirmationId}"))?
+                    .body(format!("http://localhost:3000/validateUser/?token={ConfirmationId}"))?
             },
             Mail::PwdRestore(Usuario, RestoreId) => {
                 Message::builder()
@@ -92,7 +92,7 @@ impl Mail {
                     .to(format!("{} <{}>", Usuario.nombreCompleto, Usuario.email).parse()?)
                     .subject("Restore pwd")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("http://localhost:4433/restorePwd/?token={RestoreId}"))?
+                    .body(format!("http://localhost:3000/restorePwd/?token={RestoreId}"))?
             },
             Mail::LoanProposal(LoanCreator, LoanCompleter, LoanId) => {
                 Message::builder()
@@ -100,7 +100,7 @@ impl Mail {
                     .to(format!("{} <{}>", LoanCreator.nombreCompleto, LoanCreator.email).parse()?)
                     .subject("Loan completion proposal")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("User {} wants to be your other half! See your loan here http://localhost:4433/getLoanById/{LoanId}", LoanCompleter.nombreUsuario))?
+                    .body(format!("User {} wants to be your other half! See your loan here http://localhost:3000/myLoans", LoanCompleter.nombreUsuario))?
             },
             Mail::LoanProposalAccepted(LoanCompleter, LoanId) => {
                 Message::builder()
@@ -108,7 +108,7 @@ impl Mail {
                     .to(format!("{} <{}>", LoanCompleter.nombreCompleto, LoanCompleter.email).parse()?)
                     .subject("Loan proposal accepted")
                     .header(ContentType::TEXT_PLAIN)
-                    .body(format!("Your loan completion proposal has been accepted! See the loan here http://localhost:4433/getLoanById/{LoanId}"))?
+                    .body(format!("Your loan completion proposal has been accepted! See the loan here http://localhost:3000/myLoans"))?
             }
             Mail::Test => {
                 return Err(MailError::Test);
