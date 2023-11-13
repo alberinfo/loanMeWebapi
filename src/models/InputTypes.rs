@@ -5,6 +5,16 @@ use super::usuario::Usuario;
 use super::PerfilCrediticio::PerfilCrediticio;
 use super::Prestamo::Prestamo;
 
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct InputRequestRestorePwd {
+    pub username: String
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct InputRestorePwd {
+    pub newPwd: String
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct InputPerfilCrediticio {
     pub Usuario: Usuario,

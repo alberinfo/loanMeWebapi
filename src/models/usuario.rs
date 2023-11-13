@@ -28,10 +28,6 @@ pub enum TipoUsuario {
     Administrador
 }
 
-fn shouldSkipId(x: &i64) -> bool {
-    return x == &0;
-}
-
 fn shouldSkipPwd(s: &str) -> bool {
     return !s.ends_with('*');
 }
@@ -39,7 +35,7 @@ fn shouldSkipPwd(s: &str) -> bool {
 #[derive(sqlx::FromRow, serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Usuario {
-    #[serde(skip_deserializing, skip_serializing_if="shouldSkipId")]
+    #[serde(default)]
     pub id: i64,
 
     #[serde(default)]

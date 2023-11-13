@@ -41,12 +41,12 @@ impl PrestamoTxn {
         
         let loan = Prestamo::getLoanById(self.fkPrestamo, dbPool).await?;
 
-        match (&user.tipoUsuario, loan.fkPrestamista) {
-            (Some(TipoUsuario::Administrador), _) => return Err(LoanError::InvalidDate),
-            (Some(TipoUsuario::Prestamista), Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestamista) }), //If the user is a loaner and the the loan already has an assigned prestamist
-            (Some(TipoUsuario::Prestatario), None /* If fkPrestamista is null then fkPrestatario is Some(x) */) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestatario) }),
+        match (&user.tipoUsuario, loan.fkPrestamista, loan.fkPrestatario) {
+            (Some(TipoUsuario::Administrador), _, _) => return Err(LoanError::InvalidDate),
+            (Some(TipoUsuario::Prestamista), _, None) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestamista) }), //If the user is a loaner and the the loan already has an assigned prestamist
+            (Some(TipoUsuario::Prestatario), None, _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(TipoUsuario::Prestatario) }),
 
-            (_, _) => {} //anything not covered
+            (_, _, _) => {} //anything not covered
         }
         
         let res = sqlx::query("INSERT INTO PrestamoTxns(\"fkPrestamo\", \"txnId\") VALUES($1, $2)")

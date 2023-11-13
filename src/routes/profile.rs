@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use axum::{http::{StatusCode, header}, response::IntoResponse, Json, extract::{State, Path}};
 use futures::StreamExt;
 
-use crate::{services::appState, models::{InputTypes::InputPerfilCrediticio, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}, Prestamo::{Prestamo, LoanError}, PrestamoPropuesta::{PrestamoPropuesta, PropuestaItem}}};
+use crate::{services::appState, models::{InputTypes::{InputPerfilCrediticio, InputRestorePwd, InputRequestRestorePwd}, session::Session, usuario::{Usuario, UserError}, PerfilCrediticio::PerfilCrediticio, mail::{Mail, MailError}, Prestamo::{Prestamo, LoanError}, PrestamoPropuesta::{PrestamoPropuesta, PropuestaItem}}};
 
 //Reads current user info
 pub async fn getUserInfo(State(mut appState): State<appState::AppState>, headers: header::HeaderMap) -> impl IntoResponse {
@@ -187,10 +187,12 @@ pub async fn changeCredit(State(mut appState): State<appState::AppState>, header
     };
 }
 
-pub async fn requestRestorePwd(State(mut appState): State<appState::AppState>, Json(username): Json<String>) -> impl IntoResponse {
+pub async fn requestRestorePwd(State(mut appState): State<appState::AppState>, Json(payload): Json<InputRequestRestorePwd>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConn = appState.redisState.getConnection().unwrap();
     let mailingPool = appState.mailingState.getConnection().unwrap();
+
+    let username = payload.username;
 
     let user = Usuario::buscarUsuario(&username, dbPool).await;
     if let Err(r) = user {
@@ -227,17 +229,20 @@ pub async fn requestRestorePwd(State(mut appState): State<appState::AppState>, J
     return Ok("Done");
 }
 
-pub async fn restorePwd(State(mut appState): State<appState::AppState>, Path(restoreId): Path<String>, Json(newPwd): Json<String>) -> impl IntoResponse {
+pub async fn restorePwd(State(mut appState): State<appState::AppState>, Path(restoreId): Path<String>, Json(payload): Json<InputRestorePwd>) -> impl IntoResponse {
     let dbPool = appState.dbState.getConnection().unwrap();
     let redisConn = appState.redisState.getConnection().unwrap();
 
     let mail = Mail::get("restoreId", &restoreId, redisConn).await;
 
     if let Err(err) = mail {
+        println!("JOEMAMA {}", err.to_string());
         return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}: {}", err.kind(), err.detail().unwrap_or("No further detail provided"))));
     }
 
     let mail = mail.unwrap();
+
+    let newPwd = payload.newPwd;
 
     //We do this so that we can access the enum's values
     if let Mail::PwdRestore(mut Usuario, _restoreId) = mail {

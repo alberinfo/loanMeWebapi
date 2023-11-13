@@ -42,6 +42,7 @@ impl Mail {
                 let userJson = redisConn.get_del::<String, String>(format!("{}{}", "confirmationId", id)).await?;
                 let mut user: Usuario = serde_json::from_str(&userJson).unwrap();
                 user.contrasenna.pop(); //remover el "*"
+                println!("confGet {}", user.nombreUsuario);
                 return Ok(Mail::SignupConfirm(user, id.to_string()));
             },
             "restoreId" => {
