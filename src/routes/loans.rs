@@ -256,7 +256,7 @@ pub async fn completeLoan(State(appState): State<appState::AppState>, Json(compl
 
     let user = res.unwrap();
     
-    let res = Prestamo::completeLoan(completionProposal.fkPrestamo, &completionProposal.walletId, &user, dbPool).await;
+    let res = Prestamo::completeLoan(completionProposal.fkPrestamo,  &user, dbPool).await;
 
     if let Err(r) = res {
         return match r {

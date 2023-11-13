@@ -141,7 +141,7 @@ impl Prestamo {
             return Err(LoanError::InvalidDate);
         }
 
-        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"walletChain\", \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
+        let _ = sqlx::query("INSERT INTO Prestamo(monto, \"fechaCreacion\", interes, \"plazoPago\", \"intervaloPago\", riesgo, \"walletId\", \"returnWalletId\", \"walletChain\", \"fkPrestatario\") VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
             .bind(&self.monto)
             .bind(self.fechaCreacion)
             .bind(self.interes)
@@ -158,7 +158,7 @@ impl Prestamo {
         return Ok(());
     }
 
-    pub async fn completeLoan(LoanId: i64, walletId: &String, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
+    pub async fn completeLoan(LoanId: i64, user: &usuario::Usuario, dbPool: &sqlx::PgPool) -> Result<(), LoanError> {
         let loan = Prestamo::getLoanById(LoanId, dbPool).await?;
 
         let proposal = PrestamoPropuesta::getLoanProposalById(LoanId, user.id, dbPool).await?;
@@ -166,10 +166,12 @@ impl Prestamo {
         if proposal.is_none() {
             return Err(LoanError::UserUnauthorized { expected: Some(usuario::TipoUsuario::Prestamista), found: None });
         }
+
+        let proposal = proposal.unwrap();
         
         let _ = match (user.tipoUsuario.clone().unwrap(), loan.fkPrestamista, loan.fkPrestatario) {
-            (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1, \"returnWalletId\" = $2 WHERE ID = $3").bind(user.id).bind(walletId).bind(LoanId).execute(dbPool).await?,
-            (usuario::TipoUsuario::Prestatario, Some(_), None) => sqlx::query("UPDATE Prestamo SET \"fkPrestatario\" = $1, \"walletId\" = $2 WHERE ID = $3").bind(user.id).bind(walletId).bind(LoanId).execute(dbPool).await?,
+            (usuario::TipoUsuario::Prestamista, None, Some(_)) => sqlx::query("UPDATE Prestamo SET \"fkPrestamista\" = $1, \"returnWalletId\" = $2 WHERE ID = $3").bind(user.id).bind(proposal.walletId).bind(LoanId).execute(dbPool).await?,
+            (usuario::TipoUsuario::Prestatario, Some(_), None) => sqlx::query("UPDATE Prestamo SET \"fkPrestatario\" = $1, \"walletId\" = $2 WHERE ID = $3").bind(user.id).bind(proposal.walletId).bind(LoanId).execute(dbPool).await?,
             (_, _, _) => return Err(LoanError::InvalidUser)
         };
 

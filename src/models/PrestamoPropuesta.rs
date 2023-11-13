@@ -36,7 +36,7 @@ impl PrestamoPropuesta {
                 (usuario::TipoUsuario::Administrador, _, _) => return Err(LoanError::InvalidUserType { found: Some(usuario::TipoUsuario::Administrador) }),
                 (usuario::TipoUsuario::Prestamista, Some(_), _) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestamista) }),
                 (usuario::TipoUsuario::Prestatario, _, Some(_)) => return Err(LoanError::UserUnauthorized { expected: None, found: Some(usuario::TipoUsuario::Prestatario) }),
-                (usuario::TipoUsuario::Prestamista, None, _) => sqlx::query("INSERT INTO PrestamoPropuesta(\"fkPrestamo\", \"fkUsuario\") VALUES($1, $2)").bind(LoanId).bind(user.id).execute(dbPool).await?,
+                (usuario::TipoUsuario::Prestamista, None, _) => sqlx::query("INSERT INTO PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?,
                 (usuario::TipoUsuario::Prestatario, _, None) => sqlx::query("INSERT INTO PrestamoPropuesta(\"fkPrestamo\", \"walletId\", \"fkUsuario\") VALUES($1, $2, $3)").bind(LoanId).bind(walletId).bind(user.id).execute(dbPool).await?,
             }
         };
